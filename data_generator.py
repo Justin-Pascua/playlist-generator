@@ -562,7 +562,7 @@ def read_dummy_data(path: str = 'datasets/data.jsonl', shuffle: bool = True):
     if not path.endswith('.jsonl'):
         raise ValueError(f"path must end in '.jsonl'")
 
-    ds = load_dataset(path = 'json', data_files = 'datasets/data.jsonl', split = 'train')
+    ds = load_dataset(path = 'json', data_files = path, split = 'train')
     if shuffle:
         ds = ds.shuffle()
 
