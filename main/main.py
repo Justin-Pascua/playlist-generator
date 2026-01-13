@@ -1,6 +1,10 @@
 from fastapi import FastAPI
 
+from . import models
+from .database import engine
+from .config import settings
 
+models.Base.metadata.create_all(bind = engine)
 
 # initialization process:
 # - load model
@@ -21,7 +25,7 @@ async def get_all_songs():
 
 @app.get("/playlists")
 async def get_all_playlists():
-
+    
     return {"message": "no playlists so far"}
 
 @app.post("/playlists")
