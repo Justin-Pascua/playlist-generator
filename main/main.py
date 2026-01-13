@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 
 
+
 # initialization process:
 # - load model
 # - check db
@@ -48,3 +49,4 @@ async def call_model():
     # Discord bot passes raw Discord message here
     # API calls model and generates output 
     return {"model output": "output str here"}
+

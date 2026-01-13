@@ -507,7 +507,7 @@ def output_formatter(raw: list | str):
     return output_str
 
 def write_dummy_data(batch_size: int = 1, songs_per_setlist: int = 4, path: str = 'datasets/data.jsonl', mode = 'a',
-                     include_negatives: bool = True, negatives_frac: float = 0.3):
+                     include_negatives: bool = True, negatives_frac: float = 0.3, format_targets: bool = True):
     """
     Generates dummy data and writes/appends to a .jsonl file.
     params:
@@ -542,14 +542,15 @@ def write_dummy_data(batch_size: int = 1, songs_per_setlist: int = 4, path: str 
         X = negative_X.tolist() + positive_X.tolist()
         y = negative_y.tolist() + positive_y.tolist()
 
-    y_formatted = [output_formatter(item) for item in y]
+    if format_targets:
+        y = [output_formatter(item) for item in y]
 
     with open(path, mode, encoding = 'utf-8') as f:
         for i in range(len(X)):
-            sample = {'X': X[i], 'y': y_formatted[i]}
+            sample = {'X': X[i], 'y': y[i]}
             f.write(json.dumps(sample) + '\n')
 
-def read_dummy_data(path: str = 'datasets/data.jsonl', shuffle: bool = True):
+def read_dummy_data_ds(path: str = 'datasets/data.jsonl', shuffle: bool = True):
     """
     Reads dummy data into a DatasetDict
     params:
@@ -583,3 +584,16 @@ def read_dummy_data(path: str = 'datasets/data.jsonl', shuffle: bool = True):
     })
 
     return ds_dict
+
+def read_dummy_data_df(path: str = 'datasets/data.jsonl', shuffle: bool = True):
+    """
+    Reads dummy data into a Dataframe
+    params:
+        path: a string indicating the path of the file to read. This is assumed to end in '.jsonl'
+        shuffle: a bool indicating whether or not to shuffle the data before returning
+    """
+    df = pd.read_json(path, orient = 'records', lines = True)
+    
+    if shuffle:
+        df = df.sample(frac = 1).reset_index(drop = True)
+    return df
