@@ -5,9 +5,18 @@ from sqlalchemy import pool
 
 from alembic import context
 
+from main.models import Base
+from main.config import settings
+from urllib.parse import quote_plus
+
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
+
+DB_PASSWORD_ENCODED = quote_plus(settings.MYSQL_PASSWORD)   # url encoding
+DB_URL = f"{settings.MYSQL_PROTOCOL}://{settings.MYSQL_USER}:{DB_PASSWORD_ENCODED}@{settings.MYSQL_HOST}:{settings.MYSQL_PORT}/{settings.DB_NAME}"
+
+config.set_main_option('sqlalchemy.url', DB_URL)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
