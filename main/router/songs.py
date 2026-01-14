@@ -17,7 +17,8 @@ async def get_all_songs(get_alts: bool = False, get_links: bool = False, db: Ses
     # include query params to allow user to...
     # - get or not get all alternate titles
     # - get or not get alt titles
-    return {"message": "no songs yet"}
+    result = db.query(Canonical).all()
+    return result
 
 @router.post("/")
 async def create_song(new_canonical: CanonicalCreate, 
@@ -31,23 +32,25 @@ async def create_song(new_canonical: CanonicalCreate,
     db.refresh(created_canonical)
     return created_canonical
 
-@router.get("/{id}")
-async def get_song(new_alt: AltNameCreate, db: Session = Depends(get_db)):
+@router.post("/{id}")
+async def get_song(id: int, db: Session = Depends(get_db)):
     """
-    Returns a specified song from the database
+    Returns a specified song from the database, including its alt names and link
     """
-    new_alt['canonical_id'] = id
-    created_alt = AltName(**new_alt.model_dump())
-    db.add(created_alt)
-    db.commit()
-    db.refresh(created_alt)
     pass
 
 @router.get("/{id}/alt-names")
-async def get_alt_names():
+async def get_alt_names(id: int, db: Session = Depends(get_db)):
     pass
 
 @router.post("/{id}/alt-names")
-async def create_alt_name():
-    pass
+async def create_alt_name(id: int, new_alt: AltNameCreate, db: Session = Depends(get_db)):
+    new_alt_dict = new_alt.model_dump()
+    new_alt_dict['canonical_id'] = id
+    created_alt = AltName(**new_alt_dict)
+    db.add(created_alt)
+    db.commit()
+    db.refresh(created_alt)
+    
+    return created_alt
 
