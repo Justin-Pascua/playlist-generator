@@ -1,5 +1,28 @@
-from typing import List
-from pydantic import BaseModel, ValidationError
+from typing import List, Optional, Literal
+from pydantic import BaseModel, EmailStr
+from datetime import datetime
+
+
+class UserCreate(BaseModel):
+    username: str
+    password: str
+
+class UserResponse(BaseModel):
+    id: int
+
+    class Config:
+        from_attributes = True
+
+class UserLogin(BaseModel):
+    username: str
+    password: str
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+class TokenData(BaseModel):
+    id: Optional[int] = None
 
 class PlaylistCreate(BaseModel):
     pass

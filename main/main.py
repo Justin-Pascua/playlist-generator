@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from .router import model, playlists, songs
+from .router import model, playlists, songs, auth, users
 
 # initialization process:
 # - load model
@@ -11,6 +11,8 @@ app = FastAPI()
 app.include_router(model.router)
 app.include_router(playlists.router)
 app.include_router(songs.router)
+app.include_router(auth.router)
+app.include_router(users.router)
 
 @app.get("/")
 async def root():

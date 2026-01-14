@@ -25,7 +25,7 @@ class AltName(Base):
     canonical_id: Mapped[int] = mapped_column(ForeignKey("canonical_names.id"), nullable = False)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable = False)
 
-    canonical_title = relationship("Canonical Title")
+    canonical_title = relationship("Canonical")
     user = relationship("User")
 
     def __repr__(self):
@@ -53,7 +53,7 @@ class SongLink(Base):
     link: Mapped[str] = mapped_column(String(64), unique = True, nullable = False)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable = False)
 
-    song = relationship("Song")
+    song = relationship("Canonical")
     user = relationship("User")
 
     def __repr__(self):
@@ -63,7 +63,6 @@ class User(Base):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(primary_key = True, autoincrement = True)
-    email: Mapped[str] = mapped_column(String(64), unique = True, nullable = False)
     username: Mapped[str] = mapped_column(String(64), unique = True, nullable = False)
-    password: Mapped[str] = mapped_column(String(64), nullable = False)
+    password: Mapped[str] = mapped_column(String(256), nullable = False)
 

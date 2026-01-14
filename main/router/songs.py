@@ -2,7 +2,7 @@ from fastapi import FastAPI, Response, status, HTTPException, Depends, APIRouter
 from sqlalchemy.orm import Session
 from ..database import get_db
 from ..schema import CanonicalCreate, AltNameCreate
-from ..models import Canonical, AltName
+from ..models import Canonical, AltName, SongLink
 
 router = APIRouter(
     prefix = "/songs",
@@ -14,10 +14,14 @@ async def get_all_songs(get_alts: bool = False, get_links: bool = False, db: Ses
     """
     Returns all songs in the database, and (optionally) alternate titles plus video links
     """
-    # include query params to allow user to...
-    # - get or not get all alternate titles
-    # - get or not get alt titles
-    result = db.query(Canonical).all()
+    result = db.query(Canonical)
+    
+    if get_alts:
+        result = result.join(AltName, AltName.canonical_id == Canonical.id, isouter = True)
+    if get_links:
+        result = result.join(SongLink, SongLink.song_id == Canonical.id, isouter = True)
+    result = result.all()
+
     return result
 
 @router.post("/")
