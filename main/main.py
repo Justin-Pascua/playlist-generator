@@ -1,8 +1,11 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 
 from . import models
-from .database import engine
+from .database import engine, get_db
 from .config import settings
+from .schema import CanonicalCreate
+from sqlalchemy.orm import Session
+from .utils import insert_canonical
 
 # initialization process:
 # - load model
@@ -20,6 +23,12 @@ async def root():
 async def get_all_songs():
     # include query params to allow user to get or not get all alternate titles
     return {"message": "no songs yet"}
+
+@app.post("/songs")
+async def create_song(new_canonical: CanonicalCreate, 
+                      db: Session = Depends(get_db)):
+    created_canonical = insert_canonical(new_canonical, db)
+    return created_canonical
 
 @app.get("/playlists")
 async def get_all_playlists():
