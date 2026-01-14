@@ -6,6 +6,7 @@ from .config import settings
 from .schema import CanonicalCreate
 from sqlalchemy.orm import Session
 from .utils import insert_canonical
+from .router import model, playlists, songs
 
 # initialization process:
 # - load model
@@ -14,50 +15,13 @@ from .utils import insert_canonical
 
 app = FastAPI()
 
+app.include_router(model.router)
+app.include_router(playlists.router)
+app.include_router(songs.router)
+
 @app.get("/")
 async def root():
     return {"message": "hello world"}
 
 
-@app.get("/songs")
-async def get_all_songs():
-    # include query params to allow user to get or not get all alternate titles
-    return {"message": "no songs yet"}
-
-@app.post("/songs")
-async def create_song(new_canonical: CanonicalCreate, 
-                      db: Session = Depends(get_db)):
-    created_canonical = insert_canonical(new_canonical, db)
-    return created_canonical
-
-@app.get("/playlists")
-async def get_all_playlists():
-    
-    return {"message": "no playlists so far"}
-
-@app.post("/playlists")
-async def create_playlist():
-    # user should pass a date and a list of song strings
-    # query db to check for matches
-    # for all matches, get links
-    # for all non-matches, 
-    #   - search YouTube API
-    #   - get link to top result (might need to think about this more carefully later)
-    # 
-    # gather all links and send request to YouTube API to create a playlist
-    # add links and titles of unknown songs to database
-
-    return {"playlist": "link here"}
-
-@app.post("/playlists/{id}")
-async def edit_playlist():
-    # allow user to add, remove, replace, or change order of videos in playlist
-    # add query param that indicates whether or not to reflect those changes in the song preference database
-    return {"message": "editted playlist"}
-
-@app.post("/model")
-async def call_model():
-    # Discord bot passes raw Discord message here
-    # API calls model and generates output 
-    return {"model output": "output str here"}
 
