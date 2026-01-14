@@ -20,8 +20,8 @@ class AltName(Base):
 
     id: Mapped[int] = mapped_column(primary_key = True, autoincrement = True)
     title: Mapped[str] = mapped_column(String(64), unique = True, nullable = False)
-    canonical: Mapped[str] = mapped_column(String(64), nullable = False)
-    user_id: Mapped[int] = mapped_column(nullable = False)
+    canonical_id: Mapped[int] = mapped_column(Integer, nullable = False)
+    user_id: Mapped[int] = mapped_column(Integer, nullable = False)
 
     def __repr__(self):
         return f"AltName(id = {self.id!r}, title = {self.title!r}, canonical = {self.canonical!r}, user_id = {self.user_id!r})"
@@ -42,7 +42,7 @@ class SongLink(Base):
     __tablename__ = "song_links"
 
     id: Mapped[int] = mapped_column(primary_key = True, autoincrement = True)
-    song_title: Mapped[str] = mapped_column(String(64), unique = True, nullable = False)
+    song_id: Mapped[int] = mapped_column(Integer, unique = True, nullable = False)
     link: Mapped[str] = mapped_column(String(64), unique = True, nullable = False)
     user_id: Mapped[int] = mapped_column(Integer, nullable = False)
 
