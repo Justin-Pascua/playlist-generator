@@ -1,7 +1,6 @@
 from fastapi import FastAPI, Response, status, HTTPException, Depends, APIRouter
 from sqlalchemy.orm import Session
 from ..database import get_db
-from ..utils import insert_canonical
 from ..schema import CanonicalCreate
 
 router = APIRouter(

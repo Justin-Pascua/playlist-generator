@@ -16,7 +16,6 @@ class AltNameCreate(BaseModel):
     User input for inserting an alternate song title
     """
     title: str
-    canonical: str
     user_id: int
 
 

@@ -1,11 +1,4 @@
-from fastapi import FastAPI, Depends
-
-from . import models
-from .database import engine, get_db
-from .config import settings
-from .schema import CanonicalCreate
-from sqlalchemy.orm import Session
-from .utils import insert_canonical
+from fastapi import FastAPI
 from .router import model, playlists, songs
 
 # initialization process:

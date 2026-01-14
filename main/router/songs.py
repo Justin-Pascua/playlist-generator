@@ -1,8 +1,8 @@
 from fastapi import FastAPI, Response, status, HTTPException, Depends, APIRouter
 from sqlalchemy.orm import Session
 from ..database import get_db
-from ..utils import insert_canonical
-from ..schema import CanonicalCreate
+from ..schema import CanonicalCreate, AltNameCreate
+from ..models import Canonical, AltName
 
 router = APIRouter(
     prefix = "/songs",
@@ -10,7 +10,7 @@ router = APIRouter(
 )
 
 @router.get("/")
-async def get_all_songs():
+async def get_all_songs(get_alts: bool = False, get_links: bool = False, db: Session = Depends(get_db)):
     """
     Returns all songs in the database, and (optionally) alternate titles plus video links
     """
@@ -25,14 +25,22 @@ async def create_song(new_canonical: CanonicalCreate,
     """
     Inserts a song title into the canonical_names table
     """
-    created_canonical = insert_canonical(new_canonical, db)
+    created_canonical = Canonical(**new_canonical.model_dump())
+    db.add(created_canonical)
+    db.commit()
+    db.refresh(created_canonical)
     return created_canonical
 
 @router.get("/{id}")
-async def get_song():
+async def get_song(new_alt: AltNameCreate, db: Session = Depends(get_db)):
     """
     Returns a specified song from the database
     """
+    new_alt['canonical_id'] = id
+    created_alt = AltName(**new_alt.model_dump())
+    db.add(created_alt)
+    db.commit()
+    db.refresh(created_alt)
     pass
 
 @router.get("/{id}/alt-names")
