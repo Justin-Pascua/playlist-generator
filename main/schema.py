@@ -37,6 +37,9 @@ class AltNameCreate(BaseModel):
     """
     title: str
 
+class AltNameResponse(BaseModel):
+    alt_name: str
+
 class SongLinkCreate(BaseModel):
     """
     User input for inserting a song link
@@ -47,6 +50,6 @@ class SongResponseBase(BaseModel):
     title: str
 
 class SongSummary(SongResponseBase):
-    song_link: Optional[str] = None
-    alt_names: Optional[List[str]] = None
+    song_link: Optional[str] | None = None
+    alt_names: Optional[List[str | None]] = [None]
 

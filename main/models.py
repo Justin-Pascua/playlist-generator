@@ -19,8 +19,6 @@ class Canonical(Base):
 
     user = relationship("User")
 
-    def __repr__(self):
-        return f"Canonical(id = {self.id!r}, title = {self.title!r}, user_id = {self.user_id!r})"
 
 class AltName(Base):
     __tablename__ = "alt_names"
@@ -33,9 +31,7 @@ class AltName(Base):
     canonical_title = relationship("Canonical")
     user = relationship("User")
 
-    def __repr__(self):
-        return f"AltName(id = {self.id!r}, title = {self.title!r}, canonical = {self.canonical!r}, user_id = {self.user_id!r})"
-    
+
 class Playlist(Base):
     __tablename__ = "playlists"
 
@@ -47,9 +43,6 @@ class Playlist(Base):
 
     user = relationship("User")
 
-    def __repr__(self):
-        return f"Playlist(id = {self.id!r}, playlist_title = {self.playlist_title!r}, link = {self.link!r}, user_id = {self.user_id!r}, created_at = {self.created_at})"
-    
 class SongLink(Base):
     __tablename__ = "song_links"
 
@@ -60,9 +53,6 @@ class SongLink(Base):
 
     song = relationship("Canonical")
     user = relationship("User")
-
-    def __repr__(self):
-        return f"Playlist(id = {self.id!r}, song_title = {self.song_title!r}, link = {self.link!r}, user_id = {self.user_id!r})"
 
 class User(Base):
     __tablename__ = "users"
