@@ -1,7 +1,7 @@
 from .database import Base
 from typing import List, Optional
 from datetime import datetime
-from sqlalchemy import ForeignKey
+from sqlalchemy import ForeignKey, UniqueConstraint
 from sqlalchemy import String, Integer, DateTime
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -9,8 +9,13 @@ class Canonical(Base):
     __tablename__ = "canonical_names"
 
     id: Mapped[int] = mapped_column(primary_key = True, autoincrement = True)
-    title: Mapped[str] = mapped_column(String(64), unique = True, nullable = False)
+    title: Mapped[str] = mapped_column(String(64), nullable = False)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable = False)
+
+    # multiple users can know the same song, but a given user can only record a given song at most once
+    __table_args__ = (
+        UniqueConstraint("title", "user_id", name = "title_user_pair"),
+    )
 
     user = relationship("User")
 

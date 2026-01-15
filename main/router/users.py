@@ -12,7 +12,7 @@ router = APIRouter(
     tags = ['Users']
 )
 
-
+# to do: check if username is already taken
 @router.post("/", status_code = status.HTTP_201_CREATED, response_model = UserResponse)
 def create_user(user_input: UserCreate, db: Session = Depends(get_db)):
     
@@ -21,13 +21,11 @@ def create_user(user_input: UserCreate, db: Session = Depends(get_db)):
     user_input.password = hashed_password
     
     new_user = models.User(**user_input.model_dump())
-    try:
-        db.add(new_user)
-        db.commit() # error here
-        db.refresh(new_user)
-    except Exception as e:
-        print(type(e))
-        raise e
+    
+    db.add(new_user)
+    db.commit() # error here if username already taken
+    db.refresh(new_user)
+
     return new_user
 
 @router.get("/{id}", response_model = UserResponse)
