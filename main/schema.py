@@ -25,6 +25,7 @@ class TokenData(BaseModel):
     id: Optional[int] = None
 
 
+# CANONICAL
 class CanonicalCreate(BaseModel):
     """
     User input for inserting a canonical song title
@@ -37,24 +38,39 @@ class CanonicalUpdate(BaseModel):
     """
     title: str
 
+# ALT NAME
 class AltNameCreate(BaseModel):
     """
     User input for inserting an alternate song title
     """
     title: str
 
+class AltNameUpdate(BaseModel):
+    """
+    User input for updating an alternate song title
+    """
+    title: str
 class AltNameResponse(BaseModel):
     """
     API response for sending alt names
     """
     title: str
 
+# SONG LINK
 class SongLinkCreate(BaseModel):
     """
     User input for inserting a song link
     """
     link: str
 
+class SongLinkResponse(BaseModel):
+    """
+    API response for sending song link
+    """
+    link: str
+
+
+# FULL SONG RESOURCE
 class SongResponseBase(BaseModel):
     """
     API response for sending song titles
