@@ -13,7 +13,9 @@ from urllib.parse import quote_plus
 # access to the values within the .ini file in use.
 config = context.config
 
-DB_PASSWORD_ENCODED = quote_plus(settings.MYSQL_PASSWORD).replace('%', '%%')   # url encoding
+# url encoding
+# Alembic needs an extra % sign in order to escape % signs. Note that this is not needed for the SQLAlchemy engine
+DB_PASSWORD_ENCODED = quote_plus(settings.MYSQL_PASSWORD).replace('%', '%%')   
 DB_URL = f"{settings.MYSQL_PROTOCOL}://{settings.MYSQL_USER}:{DB_PASSWORD_ENCODED}@{settings.MYSQL_HOST}:{settings.MYSQL_PORT}/{settings.DB_NAME}"
 
 config.set_main_option('sqlalchemy.url', DB_URL)
