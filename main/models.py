@@ -31,7 +31,7 @@ class AltName(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete = "CASCADE"), nullable = False)
 
     canonical_title = relationship("Canonical", back_populates = "alt_names")
-    user = relationship("User")
+    user = relationship("User", back_populates = "alt_names")
 
 
 class Playlist(Base):
@@ -54,7 +54,7 @@ class SongLink(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete = "CASCADE"), nullable = False)
 
     song = relationship("Canonical", back_populates = "song_link")
-    user = relationship("User")
+    user = relationship("User", back_populates = "song_links")
 
 class User(Base):
     __tablename__ = "users"
