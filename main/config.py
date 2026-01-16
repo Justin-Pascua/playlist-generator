@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     ALGORITHM: str
     ACCESS_TOKEN_EXPIRE_MINUTES: int
 
-    model_config = SettingsConfigDict(env_file = '.env', env_file_encoding = 'utf-8')
+    model_config = SettingsConfigDict(env_file = '.env_dev', env_file_encoding = 'utf-8')
 
 settings = Settings()
 
