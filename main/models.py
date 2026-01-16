@@ -10,14 +10,16 @@ class Canonical(Base):
 
     id: Mapped[int] = mapped_column(primary_key = True, autoincrement = True)
     title: Mapped[str] = mapped_column(String(64), nullable = False)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable = False)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete = "CASCADE"), nullable = False)
 
     # multiple users can know the same song, but a given user can only record a given song at most once
     __table_args__ = (
         UniqueConstraint("title", "user_id", name = "title_user_pair"),
     )
 
-    user = relationship("User")
+    user = relationship("User", back_populates = "canonicals")
+    alt_names = relationship("AltName", cascade = "all, delete", passive_deletes = True)
+    song_link = relationship("SongLink", cascade = "all, delete", passive_deletes = True, uselist = False)
 
 
 class AltName(Base):
@@ -25,10 +27,10 @@ class AltName(Base):
 
     id: Mapped[int] = mapped_column(primary_key = True, autoincrement = True)
     title: Mapped[str] = mapped_column(String(64), unique = True, nullable = False)
-    canonical_id: Mapped[int] = mapped_column(ForeignKey("canonical_names.id"), nullable = False)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable = False)
+    canonical_id: Mapped[int] = mapped_column(ForeignKey("canonical_names.id", ondelete = "CASCADE"), nullable = False)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete = "CASCADE"), nullable = False)
 
-    canonical_title = relationship("Canonical")
+    canonical_title = relationship("Canonical", back_populates = "alt_names")
     user = relationship("User")
 
 
@@ -38,7 +40,7 @@ class Playlist(Base):
     id: Mapped[int] = mapped_column(primary_key = True, autoincrement = True)
     playlist_title: Mapped[str] = mapped_column(String(64), nullable = True)
     link: Mapped[str] = mapped_column(String(64), unique = True, nullable = False)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable = False)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete = "CASCADE"), nullable = False)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable = False)
 
     user = relationship("User")
@@ -47,11 +49,11 @@ class SongLink(Base):
     __tablename__ = "song_links"
 
     id: Mapped[int] = mapped_column(primary_key = True, autoincrement = True)
-    song_id: Mapped[int] = mapped_column(ForeignKey("canonical_names.id"), unique = True, nullable = False)
+    song_id: Mapped[int] = mapped_column(ForeignKey("canonical_names.id", ondelete = "CASCADE"), unique = True, nullable = False)
     link: Mapped[str] = mapped_column(String(64), unique = True, nullable = False)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable = False)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete = "CASCADE"), nullable = False)
 
-    song = relationship("Canonical")
+    song = relationship("Canonical", back_populates = "song_link")
     user = relationship("User")
 
 class User(Base):
@@ -61,3 +63,6 @@ class User(Base):
     username: Mapped[str] = mapped_column(String(64), unique = True, nullable = False)
     password: Mapped[str] = mapped_column(String(256), nullable = False)
 
+    canonicals = relationship("Canonical", cascade = "all, delete", passive_deletes = True)
+    alt_names = relationship("AltName", cascade = "all, delete", passive_deletes = True)
+    song_links = relationship("SongLink", cascade = "all, delete", passive_deletes = True)

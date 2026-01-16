@@ -8,7 +8,7 @@ from sqlalchemy.dialects.mysql import JSON
 from typing import List, Optional
 
 from ..database import get_db
-from ..schema import CanonicalCreate, AltNameCreate, AltNameResponse, SongLinkCreate, SongSummary
+from ..schema import CanonicalCreate, CanonicalUpdate, AltNameCreate, AltNameResponse, SongLinkCreate, SongSummary
 from ..models import Canonical, AltName, SongLink
 from .. import oauth2
 
@@ -17,6 +17,7 @@ router = APIRouter(
     tags = ['Songs']
 )
 
+# SONG SUMMARIES
 @router.get("/", response_model = List[SongSummary], response_model_exclude_defaults = True)
 async def get_all_songs(get_links: bool = False, get_alts: bool = False, 
                         db: Session = Depends(get_db),
@@ -26,7 +27,7 @@ async def get_all_songs(get_links: bool = False, get_alts: bool = False,
     """
 
     # choose fields to fetch
-    select_cols = [Canonical.title.label("title")]
+    select_cols = [Canonical.title.label("title"), Canonical.id.label("id")]
     if get_links:
         select_cols.append(SongLink.link.label("song_link"))
     if get_alts:
@@ -42,29 +43,12 @@ async def get_all_songs(get_links: bool = False, get_alts: bool = False,
                 .group_by(Canonical.id))
 
     result = db.execute(stmt).all() 
-    print(result)
-    return result
-
-
-
-@router.post("/", status_code = status.HTTP_201_CREATED)
-async def create_song(new_canonical: CanonicalCreate, 
-                      db: Session = Depends(get_db),
-                      current_user = Depends(oauth2.get_current_user)):
-    """
-    Inserts a song title into the canonical_names table
-    """
-    created_canonical = Canonical(user_id = current_user.id, **new_canonical.model_dump())
-    db.add(created_canonical)
-    try:
-        db.commit()
-    except IntegrityError:
-        db.rollback()
-        raise HTTPException(status_code = status.HTTP_409_CONFLICT, 
-                            detail = "Song already exists in your database")
     
-    db.refresh(created_canonical)
-    return created_canonical
+    if not result:
+        raise HTTPException(status_code = status.HTTP_404_NOT_FOUND,
+                            detail = 'No songs found')
+
+    return result
 
 @router.get("/{id}", response_model = SongSummary)
 async def get_song(id: int, 
@@ -75,6 +59,7 @@ async def get_song(id: int,
     """
     stmt = (select(
         Canonical.title.label('title'),
+        Canonical.id.label('id'),
         Canonical.user_id.label('user_id'),
         SongLink.link.label("song_link"),
         func.json_arrayagg(AltName.title).label("alt_names").cast(JSON).label("alt_names")
@@ -99,8 +84,67 @@ async def get_song(id: int,
 
     return result
 
+# CANONICAL NAMES
+@router.post("/", status_code = status.HTTP_201_CREATED)
+async def create_song(new_canonical: CanonicalCreate, 
+                      db: Session = Depends(get_db),
+                      current_user = Depends(oauth2.get_current_user)):
+    """
+    Inserts a song title into the canonical_names table
+    """
+    created_canonical = Canonical(user_id = current_user.id, **new_canonical.model_dump())
+    db.add(created_canonical)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code = status.HTTP_409_CONFLICT, 
+                            detail = "Song already exists in your database")
+    
+    db.refresh(created_canonical)
+    return created_canonical
+
+@router.patch("/{id}")
+async def update_canonical_name(id: int,
+                                new_canonical: CanonicalUpdate,
+                                db: Session = Depends(get_db),
+                                current_user = Depends(oauth2.get_current_user)):
+    """
+    Update the canonical title of a song
+    """
+
+    song = db.scalar(select(Canonical).where(Canonical.id == id))
+
+    if not song:
+        raise HTTPException(status_code = status.HTTP_404_NOT_FOUND,
+                            detail = f"Item not found")
+    
+    if song.user_id != current_user.id:
+        raise HTTPException(status_code = status.HTTP_403_FORBIDDEN,
+                            detail = f"You do not have access to this item")
+    
+    song.title = new_canonical.title
+
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code = status.HTTP_409_CONFLICT,
+                            detail = f"New name conflicts with an existing item")
+    
+    db.refresh(song)
+    return song
+
+@router.delete("/{id}")
+async def delete_song(id: int,
+                      db: Session = Depends(get_db),
+                      current_user = Depends(oauth2.get_current_user)):
+    # need to add ondelete property in sqlalchemy model
+    pass
+
+# ALT NAMES
 @router.get("/{id}/alt-names", response_model = List[AltNameResponse])
-async def get_alt_names(id: int, 
+async def get_all_alt_names(id: int, 
                         db: Session = Depends(get_db),
                         current_user = Depends(oauth2.get_current_user)):
     stmt = (select(
@@ -121,7 +165,7 @@ async def get_alt_names(id: int,
     return result
 
 # need to check if user is authorized to modify song[id]
-@router.post("/{id}/alt-names")
+@router.post("/{id}/alt-names", response_model = AltNameResponse)
 async def create_alt_name(id: int, new_alt: AltNameCreate, 
                           db: Session = Depends(get_db),
                           current_user = Depends(oauth2.get_current_user)):
@@ -139,6 +183,27 @@ async def create_alt_name(id: int, new_alt: AltNameCreate,
     
     return created_alt
 
+@router.get("/{canonical_id}/alt-names/{alt_id}", response_model = AltNameResponse)
+async def get_alt_name(canonical_id: int, alt_id: int,
+                       db: Session = Depends(get_db),
+                       current_user = Depends(oauth2.get_current_user)):
+    pass
+
+
+@router.patch("/{canonical_id}/alt-names/{alt_id}")
+async def update_alt_name(canonical_id: int, alt_id: int,
+                          db: Session = Depends(get_db),
+                          current_user = Depends(oauth2.get_current_user)):
+    pass
+
+@router.delete("/{canonical_id}/alt-names/{alt_id}")
+async def delete_alt_name(canonical_id: int, alt_id: int,
+                          db: Session = Depends(get_db),
+                          current_user = Depends(oauth2.get_current_user)):
+    pass
+
+
+# SONG LINKS
 @router.get("/{id}/song-links")
 async def get_link(id: int,
                    db: Session = Depends(get_db),
@@ -147,10 +212,7 @@ async def get_link(id: int,
     Create a link for a song
     """
 
-    result = (db.query(SongLink)
-              .filter(SongLink.user_id == current_user.id)
-              .filter(SongLink.song_id == id)
-              .all())
+    result = {'message': 'placeholder'}
 
     return result
 
@@ -162,9 +224,11 @@ async def assign_link(id: int, new_link: SongLinkCreate,
     """
     Create or edit link for a song
     """
-    created_link = SongLink(song_id = id, user_id = current_user.id, **new_link.model_dump())
-    db.add(created_link)
-    db.commit()
-    db.refresh(created_link)
+    # created_link = SongLink(song_id = id, user_id = current_user.id, **new_link.model_dump())
+    # db.add(created_link)
+    # db.commit()
+    # db.refresh(created_link)
+    
 
-    return created_link
+
+    return {"message": "placeholder"}

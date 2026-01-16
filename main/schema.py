@@ -31,6 +31,12 @@ class CanonicalCreate(BaseModel):
     """
     title: str
 
+class CanonicalUpdate(BaseModel):
+    """
+    User input for updating a canonical song title
+    """
+    title: str
+
 class AltNameCreate(BaseModel):
     """
     User input for inserting an alternate song title
@@ -47,6 +53,7 @@ class SongLinkCreate(BaseModel):
     link: str
 
 class SongResponseBase(BaseModel):
+    id: int
     title: str
 
 class SongSummary(SongResponseBase):
