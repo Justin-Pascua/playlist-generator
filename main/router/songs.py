@@ -135,12 +135,27 @@ async def update_canonical_name(id: int,
     db.refresh(song)
     return song
 
-@router.delete("/{id}")
+@router.delete("/{id}", status_code = status.HTTP_204_NO_CONTENT)
 async def delete_song(id: int,
                       db: Session = Depends(get_db),
                       current_user = Depends(oauth2.get_current_user)):
-    # need to add ondelete property in sqlalchemy model
-    pass
+    """
+    Delete a song, including its alternate titles and song link
+    """
+    song = db.scalar(select(Canonical).where(Canonical.id == id))
+    if not song:
+        raise HTTPException(status_code = status.HTTP_404_NOT_FOUND,
+                            detail = f"Item not found")
+    
+    if song.user_id != current_user.id:
+        raise HTTPException(status_code = status.HTTP_403_FORBIDDEN,
+                            detail = f"You do not have access to this item") 
+
+    db.delete(song)
+    db.commit()
+
+    return Response(status_code = status.HTTP_204_NO_CONTENT,
+                    detail = f"Successfully deleted item")
 
 # ALT NAMES
 @router.get("/{id}/alt-names", response_model = List[AltNameResponse])
@@ -164,21 +179,36 @@ async def get_all_alt_names(id: int,
     
     return result
 
-# need to check if user is authorized to modify song[id]
-@router.post("/{id}/alt-names", response_model = AltNameResponse)
+@router.post("/{id}/alt-names", response_model = AltNameResponse, status_code = status.HTTP_201_CREATED)
 async def create_alt_name(id: int, new_alt: AltNameCreate, 
                           db: Session = Depends(get_db),
                           current_user = Depends(oauth2.get_current_user)):
     """
     Create an alt name for a song
     """
+    # check if song exists in canonical_names table
+    song = db.scalar(select(Canonical).where(Canonical.id == id))
+
+    if not song:
+        raise HTTPException(status_code = status.HTTP_404_NOT_FOUND,
+                            detail = f"Item not found")
+    
+    if song.user_id != current_user.id:
+        raise HTTPException(status_code = status.HTTP_403_FORBIDDEN,
+                            detail = f"You do not have access to this item")
 
     created_alt = AltName(
         user_id = current_user.id, 
         canonical_id = id, 
         **new_alt.model_dump())
     db.add(created_alt)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code = status.HTTP_409_CONFLICT, 
+                            detail = "Alt title already exists in your database")
+
     db.refresh(created_alt)
     
     return created_alt

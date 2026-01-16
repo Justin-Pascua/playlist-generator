@@ -44,7 +44,10 @@ class AltNameCreate(BaseModel):
     title: str
 
 class AltNameResponse(BaseModel):
-    alt_name: str
+    """
+    API response for sending alt names
+    """
+    title: str
 
 class SongLinkCreate(BaseModel):
     """
@@ -53,10 +56,16 @@ class SongLinkCreate(BaseModel):
     link: str
 
 class SongResponseBase(BaseModel):
+    """
+    API response for sending song titles
+    """
     id: int
     title: str
 
 class SongSummary(SongResponseBase):
+    """
+    API response for sending song details
+    """
     song_link: Optional[str] | None = None
     alt_names: Optional[List[str | None]] = [None]
 
