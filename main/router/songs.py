@@ -159,233 +159,86 @@ async def delete_song(id: int,
 
     return Response(status_code = status.HTTP_204_NO_CONTENT)
 
-# ALT NAMES
-@router.post("/{id}/alt-names", response_model = AltNameResponse, status_code = status.HTTP_201_CREATED)
-async def create_alt_name(id: int, new_alt: AltNameCreate, 
-                          db: Session = Depends(get_db),
-                          current_user = Depends(oauth2.get_current_user)):
-    """
-    Create an alt name for a song
-    """
-    # check if song exists in canonical_names table
-    song = db.scalar(select(Canonical).where(Canonical.id == id))
-
-    if not song:
-        raise HTTPException(status_code = status.HTTP_404_NOT_FOUND,
-                            detail = f"Song not found")
-    
-    if song.user_id != current_user.id:
-        raise HTTPException(status_code = status.HTTP_403_FORBIDDEN,
-                            detail = f"You do not have access to this song")
-
-    created_alt = AltName(
-        user_id = current_user.id, 
-        canonical_id = id, 
-        **new_alt.model_dump())
-    db.add(created_alt)
-    try:
-        db.commit()
-    except IntegrityError:
-        db.rollback()
-        raise HTTPException(status_code = status.HTTP_409_CONFLICT, 
-                            detail = "Given alt name is already assigned to the specified song")
-
-    db.refresh(created_alt)
-    
-    return created_alt
-
-@router.get("/{id}/alt-names", response_model = List[AltNameResponse])
-async def get_all_alt_names(id: int, 
-                        db: Session = Depends(get_db),
-                        current_user = Depends(oauth2.get_current_user)):
-    """
-    Get all alt names of a given sing
-    """
-    song = db.scalar(select(Canonical).where(Canonical.id == id))
-    if not song:
-        raise HTTPException(status_code = status.HTTP_404_NOT_FOUND,
-                            detail = f"Song not found")
-    
-    if song.user_id != current_user.id:
-        raise HTTPException(status_code = status.HTTP_403_FORBIDDEN,
-                            detail = f"You do not have access to this song")
-    
-    result = db.execute(
-        select(AltName.title)
-        .where(AltName.canonical_id == id)
-    ).all()
-
-    if not result:
-        raise HTTPException(status_code = status.HTTP_404_NOT_FOUND,
-                            detail = f"No alt names found")
-    
-    return result
-
-@router.get("/{canonical_id}/alt-names/{alt_id}", response_model = AltNameResponse)
-async def get_alt_name(canonical_id: int, alt_id: int,
-                       db: Session = Depends(get_db),
-                       current_user = Depends(oauth2.get_current_user)):
-    """
-    Get specified alt name of a specified song
-    """
-    song = db.scalar(select(Canonical).where(Canonical.id == canonical_id))
-    if not song:
-        raise HTTPException(status_code = status.HTTP_404_NOT_FOUND,
-                            detail = f"Song not found")
-    
-    if song.user_id != current_user.id:
-        raise HTTPException(status_code = status.HTTP_403_FORBIDDEN,
-                            detail = f"You do not have access to this song")
-    
-    alt_name = db.scalar(select(AltName)
-                         .where(AltName.canonical_id == canonical_id)
-                         .where(AltName.id == alt_id)
-                         .where(AltName.user_id == current_user.id))
-
-    if not alt_name:
-        raise HTTPException(status_code = status.HTTP_404_NOT_FOUND,
-                            detail = f"Alt name not found")
-
-    return alt_name
-
-@router.patch("/{canonical_id}/alt-names/{alt_id}")
-async def update_alt_name(canonical_id: int, alt_id: int,
-                          new_alt: AltNameUpdate,
-                          db: Session = Depends(get_db),
-                          current_user = Depends(oauth2.get_current_user)):
-    song = db.scalar(select(Canonical).where(Canonical.id == canonical_id))
-    if not song:
-        raise HTTPException(status_code = status.HTTP_404_NOT_FOUND,
-                            detail = f"Song not found")
-    if song.user_id != current_user.id:
-        raise HTTPException(status_code = status.HTTP_403_FORBIDDEN,
-                            detail = f"You do not have access to this song")
-    
-    alt_name = db.scalar(select(AltName).where(AltName.id == alt_id))
-    if not alt_name:
-        raise HTTPException(status_code = status.HTTP_404_NOT_FOUND,
-                            detail = f"Alt name not found")
-    if alt_name.user_id != current_user.id:
-        raise HTTPException(status_code = status.HTTP_403_FORBIDDEN,
-                            detail = f"You do not have access to this alt name")
-    
-    alt_name.title = new_alt.title
-
-    try:
-        db.commit()
-    except IntegrityError:
-        db.rollback()
-        raise HTTPException(status_code = status.HTTP_409_CONFLICT,
-                            detail = f"This alt name already exists for the given song")
-    
-    db.refresh(alt_name)
-    return alt_name
-    
-@router.delete("/{canonical_id}/alt-names/{alt_id}")
-async def delete_alt_name(canonical_id: int, alt_id: int,
-                          db: Session = Depends(get_db),
-                          current_user = Depends(oauth2.get_current_user)):
-    song = db.scalar(select(Canonical).where(Canonical.id == canonical_id))
-    if not song:
-        raise HTTPException(status_code = status.HTTP_404_NOT_FOUND,
-                            detail = f"Song not found")
-    if song.user_id != current_user.id:
-        raise HTTPException(status_code = status.HTTP_403_FORBIDDEN,
-                            detail = f"You do not have access to this song")
-    
-    alt_name = db.scalar(select(AltName).where(AltName.id == alt_id))
-    if not alt_name:
-        raise HTTPException(status_code = status.HTTP_404_NOT_FOUND,
-                            detail = f"Alt name not found")
-    if alt_name.user_id != current_user.id:
-        raise HTTPException(status_code = status.HTTP_403_FORBIDDEN,
-                            detail = f"You do not have access to this alt name")
-    
-    db.delete(alt_name)
-    db.commit()
-
-    return Response(status_code = status.HTTP_204_NO_CONTENT)
-
-
 # SONG LINKS
-@router.put("/{id}/song-links")
-async def upsert_link(id: int, new_link: SongLinkCreate,
-                      db: Session = Depends(get_db),
-                      current_user = Depends(oauth2.get_current_user)):
-    """
-    Create or edit link for a song
-    """
-    song = db.scalar(select(Canonical).where(Canonical.id == id))
-    if not song:
-        raise HTTPException(status_code = status.HTTP_404_NOT_FOUND,
-                            detail = f"Song not found")
+# @router.put("/{id}/song-links")
+# async def upsert_link(id: int, new_link: SongLinkCreate,
+#                       db: Session = Depends(get_db),
+#                       current_user = Depends(oauth2.get_current_user)):
+#     """
+#     Create or edit link for a song
+#     """
+#     song = db.scalar(select(Canonical).where(Canonical.id == id))
+#     if not song:
+#         raise HTTPException(status_code = status.HTTP_404_NOT_FOUND,
+#                             detail = f"Song not found")
     
-    if song.user_id != current_user.id:
-        raise HTTPException(status_code = status.HTTP_403_FORBIDDEN,
-                            detail = f"You do not have access to this song")
+#     if song.user_id != current_user.id:
+#         raise HTTPException(status_code = status.HTTP_403_FORBIDDEN,
+#                             detail = f"You do not have access to this song")
     
-    link = db.scalar(select(SongLink)
-                     .where(SongLink.song_id == id)
-                     .where(SongLink.user_id == current_user.id))
+#     link = db.scalar(select(SongLink)
+#                      .where(SongLink.song_id == id)
+#                      .where(SongLink.user_id == current_user.id))
     
-    # if link exists, then update
-    if link:
-        link.link = new_link.link
-    # otherwise, insert into db
-    else:
-        link = SongLink(song_id = id, user_id = current_user.id, link = new_link.link)
-        db.add(link)
+#     # if link exists, then update
+#     if link:
+#         link.link = new_link.link
+#     # otherwise, insert into db
+#     else:
+#         link = SongLink(song_id = id, user_id = current_user.id, link = new_link.link)
+#         db.add(link)
 
-    db.commit()
-    db.refresh(link)
+#     db.commit()
+#     db.refresh(link)
 
-    return link
+#     return link
 
-@router.get("/{id}/song-links", response_model = SongLinkResponse)
-async def get_link(id: int,
-                   db: Session = Depends(get_db),
-                   current_user = Depends(oauth2.get_current_user)):
-    """
-    Get link for a song
-    """
-    song = db.scalar(select(Canonical).where(Canonical.id == id))
-    if not song:
-        raise HTTPException(status_code = status.HTTP_404_NOT_FOUND,
-                            detail = f"Song not found")
+# @router.get("/{id}/song-links", response_model = SongLinkResponse)
+# async def get_link(id: int,
+#                    db: Session = Depends(get_db),
+#                    current_user = Depends(oauth2.get_current_user)):
+#     """
+#     Get link for a song
+#     """
+#     song = db.scalar(select(Canonical).where(Canonical.id == id))
+#     if not song:
+#         raise HTTPException(status_code = status.HTTP_404_NOT_FOUND,
+#                             detail = f"Song not found")
     
-    if song.user_id != current_user.id:
-        raise HTTPException(status_code = status.HTTP_403_FORBIDDEN,
-                            detail = f"You do not have access to this song")
+#     if song.user_id != current_user.id:
+#         raise HTTPException(status_code = status.HTTP_403_FORBIDDEN,
+#                             detail = f"You do not have access to this song")
     
-    result = db.scalar(select(SongLink).where(SongLink.song_id == id))
+#     result = db.scalar(select(SongLink).where(SongLink.song_id == id))
 
-    if not result:
-        raise HTTPException(status_code = status.HTTP_404_NOT_FOUND,
-                            detail = f"No link found")
+#     if not result:
+#         raise HTTPException(status_code = status.HTTP_404_NOT_FOUND,
+#                             detail = f"No link found")
     
-    return result
+#     return result
 
-@router.delete("/{id}/song-links")
-async def delete_link(id: int,
-                      db: Session = Depends(get_db),
-                      current_user = Depends(oauth2.get_current_user)):
-    song = db.scalar(select(Canonical).where(Canonical.id == id))
-    if not song:
-        raise HTTPException(status_code = status.HTTP_404_NOT_FOUND,
-                            detail = f"Song not found")
-    if song.user_id != current_user.id:
-        raise HTTPException(status_code = status.HTTP_403_FORBIDDEN,
-                            detail = f"You do not have access to this song")
+# @router.delete("/{id}/song-links")
+# async def delete_link(id: int,
+#                       db: Session = Depends(get_db),
+#                       current_user = Depends(oauth2.get_current_user)):
+#     song = db.scalar(select(Canonical).where(Canonical.id == id))
+#     if not song:
+#         raise HTTPException(status_code = status.HTTP_404_NOT_FOUND,
+#                             detail = f"Song not found")
+#     if song.user_id != current_user.id:
+#         raise HTTPException(status_code = status.HTTP_403_FORBIDDEN,
+#                             detail = f"You do not have access to this song")
     
-    link = db.scalar(select(SongLink).where(SongLink.song_id == id))
-    if not link:
-        raise HTTPException(status_code = status.HTTP_404_NOT_FOUND,
-                            detail = f"Link not found")
-    if link.user_id != current_user.id:
-        raise HTTPException(status_code = status.HTTP_403_FORBIDDEN,
-                            detail = f"You do not have access to this link")
+#     link = db.scalar(select(SongLink).where(SongLink.song_id == id))
+#     if not link:
+#         raise HTTPException(status_code = status.HTTP_404_NOT_FOUND,
+#                             detail = f"Link not found")
+#     if link.user_id != current_user.id:
+#         raise HTTPException(status_code = status.HTTP_403_FORBIDDEN,
+#                             detail = f"You do not have access to this link")
     
-    db.delete(link)
-    db.commit()
+#     db.delete(link)
+#     db.commit()
 
-    return Response(status_code = status.HTTP_204_NO_CONTENT)
+#     return Response(status_code = status.HTTP_204_NO_CONTENT)
+

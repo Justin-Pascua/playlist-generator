@@ -44,17 +44,21 @@ class AltNameCreate(BaseModel):
     User input for inserting an alternate song title
     """
     title: str
+    canonical_id: int = 0   # 0 is canonical_id of unassigned songs
 
 class AltNameUpdate(BaseModel):
     """
     User input for updating an alternate song title
     """
-    title: str
+    title: Optional[str] = None
+    canonical_id: Optional[int] = None
 class AltNameResponse(BaseModel):
     """
     API response for sending alt names
     """
+    id: int
     title: str
+    canonical_id: int
 
 # SONG LINK
 class SongLinkCreate(BaseModel):
