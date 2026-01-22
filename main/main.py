@@ -1,11 +1,6 @@
 from fastapi import FastAPI
 from .router import model, playlists, songs, auth, users, alt_names
 
-# initialization process:
-# - load model
-# - check db
-# - maybe ping YouTube API?
-
 app = FastAPI()
 
 app.include_router(auth.router)

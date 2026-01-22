@@ -39,7 +39,7 @@ async def create_alt_name(new_alt: AltNameCreate,
         user_id = current_user.id, 
         **new_alt.model_dump())
     db.add(created_alt)
-    db.commit()
+    
     try:
         db.commit()
     except IntegrityError as e:

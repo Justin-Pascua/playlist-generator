@@ -2,6 +2,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     HF_TOKEN: str
+
+    YT_API_KEY: str
     
     MYSQL_PROTOCOL: str
     MYSQL_HOST: str
