@@ -11,7 +11,7 @@ from ..database import get_db
 from ..schema import (SongSummary,
                       CanonicalCreate, CanonicalUpdate, 
                       AltNameCreate, AltNameResponse, AltNameUpdate, 
-                      SongLinkCreate, SongLinkResponse)
+                      VideoCreate, VideoResponse)
 from ..models import Canonical, AltName, Video
 from .. import oauth2
 
@@ -159,14 +159,13 @@ async def delete_song(id: int,
 
     return Response(status_code = status.HTTP_204_NO_CONTENT)
 
-# SONG LINKS
-# TO DO: rename this to video, and adjust to new model
-@router.put("/{id}/song-links")
-async def upsert_link(id: int, new_link: SongLinkCreate,
+# VIDEOS
+@router.put("/{id}/video")
+async def upsert_video(id: int, new_video: VideoCreate,
                       db: Session = Depends(get_db),
                       current_user = Depends(oauth2.get_current_user)):
     """
-    Create or edit link for a song
+    Create or replace video associated to canonical title
     """
     song = db.scalar(select(Canonical).where(Canonical.id == id))
     if not song:
@@ -177,29 +176,36 @@ async def upsert_link(id: int, new_link: SongLinkCreate,
         raise HTTPException(status_code = status.HTTP_403_FORBIDDEN,
                             detail = f"You do not have access to this song")
     
-    link = db.scalar(select(Video)
+    video = db.scalar(select(Video)
                      .where(Video.canonical_name_id == id)
                      .where(Video.user_id == current_user.id))
     
+    root = 'http://youtu.be/'
+
     # if link exists, then update
-    if link:
-        link.link = new_link.link
+    if video:
+        video.id = new_video.id
+        video.link = root + new_video.id
     # otherwise, insert into db
     else:
-        link = Video(song_id = id, user_id = current_user.id, link = new_link.link)
-        db.add(link)
+        video = Video(
+            id = new_video.id,
+            canonical_name_id = id, 
+            user_id = current_user.id, 
+            link = root + new_video.id)
+        db.add(video)
 
     db.commit()
-    db.refresh(link)
+    db.refresh(video)
 
-    return link
+    return video
 
-@router.get("/{id}/song-links", response_model = SongLinkResponse)
-async def get_link(id: int,
+@router.get("/{id}/video", response_model = VideoResponse)
+async def get_video(id: int,
                    db: Session = Depends(get_db),
                    current_user = Depends(oauth2.get_current_user)):
     """
-    Get link for a song
+    Get video info for a song
     """
     song = db.scalar(select(Canonical).where(Canonical.id == id))
     if not song:
@@ -218,10 +224,14 @@ async def get_link(id: int,
     
     return result
 
-@router.delete("/{id}/song-links")
-async def delete_link(id: int,
+@router.delete("/{id}/video")
+async def delete_video(id: int,
                       db: Session = Depends(get_db),
                       current_user = Depends(oauth2.get_current_user)):
+    """
+    Delete video item from database
+    """
+
     song = db.scalar(select(Canonical).where(Canonical.id == id))
     if not song:
         raise HTTPException(status_code = status.HTTP_404_NOT_FOUND,
@@ -230,15 +240,15 @@ async def delete_link(id: int,
         raise HTTPException(status_code = status.HTTP_403_FORBIDDEN,
                             detail = f"You do not have access to this song")
     
-    link = db.scalar(select(Video).where(Video.canonical_name_id == id))
-    if not link:
+    video = db.scalar(select(Video).where(Video.canonical_name_id == id))
+    if not video:
         raise HTTPException(status_code = status.HTTP_404_NOT_FOUND,
                             detail = f"Link not found")
-    if link.user_id != current_user.id:
+    if video.user_id != current_user.id:
         raise HTTPException(status_code = status.HTTP_403_FORBIDDEN,
                             detail = f"You do not have access to this link")
     
-    db.delete(link)
+    db.delete(video)
     db.commit()
 
     return Response(status_code = status.HTTP_204_NO_CONTENT)
