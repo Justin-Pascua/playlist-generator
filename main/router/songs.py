@@ -12,7 +12,7 @@ from ..schema import (SongSummary,
                       CanonicalCreate, CanonicalUpdate, 
                       AltNameCreate, AltNameResponse, AltNameUpdate, 
                       SongLinkCreate, SongLinkResponse)
-from ..models import Canonical, AltName, SongLink
+from ..models import Canonical, AltName, Video
 from .. import oauth2
 
 router = APIRouter(
@@ -32,14 +32,14 @@ async def get_all_songs(get_links: bool = False, get_alts: bool = False,
     # choose fields to fetch
     select_cols = [Canonical.title.label("title"), Canonical.id.label("id")]
     if get_links:
-        select_cols.append(SongLink.link.label("song_link"))
+        select_cols.append(Video.link.label("song_link"))
     if get_alts:
         select_cols.append(func.json_arrayagg(AltName.title).cast(JSON).label("alt_names"))
 
     # build query statement
     stmt = select(*select_cols).where(Canonical.user_id == current_user.id)
     if get_links:
-        stmt = stmt.join(SongLink, Canonical.id == SongLink.song_id, isouter = True)
+        stmt = stmt.join(Video, Canonical.id == Video.canonical_name_id, isouter = True)
     if get_alts:
         stmt = (stmt
                 .join(AltName, Canonical.id == AltName.canonical_id, isouter = True)
@@ -64,13 +64,13 @@ async def get_song(id: int,
         Canonical.title.label('title'),
         Canonical.id.label('id'),
         Canonical.user_id.label('user_id'),
-        SongLink.link.label("song_link"),
+        Video.link.label("song_link"),
         func.json_arrayagg(AltName.title).label("alt_names").cast(JSON).label("alt_names")
         )
         .where(Canonical.id == id)
-        .join(SongLink, Canonical.id == SongLink.song_id, isouter = True)
+        .join(Video, Canonical.id == Video.canonical_name_id, isouter = True)
         .join(AltName, Canonical.id == AltName.canonical_id, isouter = True)
-        .group_by(Canonical.id, Canonical.title, SongLink.link))
+        .group_by(Canonical.id, Canonical.title, Video.link))
     
     result = db.execute(stmt).first()
     # check if song exists
@@ -160,6 +160,7 @@ async def delete_song(id: int,
     return Response(status_code = status.HTTP_204_NO_CONTENT)
 
 # SONG LINKS
+# TO DO: rename this to video, and adjust to new model
 @router.put("/{id}/song-links")
 async def upsert_link(id: int, new_link: SongLinkCreate,
                       db: Session = Depends(get_db),
@@ -176,16 +177,16 @@ async def upsert_link(id: int, new_link: SongLinkCreate,
         raise HTTPException(status_code = status.HTTP_403_FORBIDDEN,
                             detail = f"You do not have access to this song")
     
-    link = db.scalar(select(SongLink)
-                     .where(SongLink.song_id == id)
-                     .where(SongLink.user_id == current_user.id))
+    link = db.scalar(select(Video)
+                     .where(Video.canonical_name_id == id)
+                     .where(Video.user_id == current_user.id))
     
     # if link exists, then update
     if link:
         link.link = new_link.link
     # otherwise, insert into db
     else:
-        link = SongLink(song_id = id, user_id = current_user.id, link = new_link.link)
+        link = Video(song_id = id, user_id = current_user.id, link = new_link.link)
         db.add(link)
 
     db.commit()
@@ -209,7 +210,7 @@ async def get_link(id: int,
         raise HTTPException(status_code = status.HTTP_403_FORBIDDEN,
                             detail = f"You do not have access to this song")
     
-    result = db.scalar(select(SongLink).where(SongLink.song_id == id))
+    result = db.scalar(select(Video).where(Video.canonical_name_id == id))
 
     if not result:
         raise HTTPException(status_code = status.HTTP_404_NOT_FOUND,
@@ -229,7 +230,7 @@ async def delete_link(id: int,
         raise HTTPException(status_code = status.HTTP_403_FORBIDDEN,
                             detail = f"You do not have access to this song")
     
-    link = db.scalar(select(SongLink).where(SongLink.song_id == id))
+    link = db.scalar(select(Video).where(Video.canonical_name_id == id))
     if not link:
         raise HTTPException(status_code = status.HTTP_404_NOT_FOUND,
                             detail = f"Link not found")

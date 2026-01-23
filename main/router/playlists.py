@@ -1,13 +1,18 @@
 from fastapi import FastAPI, Response, status, HTTPException, Depends, APIRouter
-from sqlalchemy.orm import Session
 
-from typing import Literal
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
+
+from googleapiclient.discovery import Resource
+
+from typing import Literal, List
 import datetime
 
 from ..database import get_db
-from ..schema import PlaylistCreate
+from ..schema import PlaylistCreate, PlaylistResponse
 from .. import oauth2
-from ..youtube import PlaylistEditor, get_yt_service
+from ..youtube import get_yt_service
 from ..models import Playlist
 
 router = APIRouter(
@@ -15,15 +20,23 @@ router = APIRouter(
     tags = ['Playlists']
 )
 
-@router.get("/")
-async def get_all_playlists():
+@router.get("/", response_model = List[PlaylistResponse])
+async def get_all_playlists(db: Session = Depends(get_db),
+                            current_user = Depends(oauth2.get_current_user)):
     
-    return {"message": "no playlists so far"}
+    stmt = select(Playlist).where(Playlist.user_id == current_user.id)
+    result = db.execute(stmt).scalars().all()
+
+    if not result:
+        raise HTTPException(status_code = status.HTTP_404_NOT_FOUND,
+                            detail = 'No playlists found')
+    
+    return result
 
 @router.post("/")
 async def create_playlist(payload: PlaylistCreate,
                           db: Session = Depends(get_db),
-                          yt_service = Depends(get_yt_service),
+                          yt_service: Resource = Depends(get_yt_service),
                           current_user = Depends(oauth2.get_current_user)):
     # user should pass a date and a list of song strings
     # query db to check for matches
@@ -34,20 +47,22 @@ async def create_playlist(payload: PlaylistCreate,
     # 
     # gather all links and send request to YouTube API to create a playlist
     # add links and titles of unknown songs to database
-    
-    print("e")
 
-    # create empty playlist through YouTube Data API
-    playlist_editor = PlaylistEditor(mode = 'create_new', 
-                                     title = payload.title, 
-                                     privacy_status = payload.privacy_status)
+    request = yt_service.playlists().insert(
+        part = "id,snippet,status",
+        body = {"snippet": {"title": payload.title},
+                "status": {"privacyStatus": payload.privacy_status}
+                })
+    response = request.execute()
 
-    # add new playlist to database
+    root = "https://youtube.com/playlist?list="
+
     new_playlist = Playlist(
-        playlist_title = playlist_editor.title,
-        link = playlist_editor.link,
+        id = response['id'],
+        playlist_title = payload.title,
+        link = root + response['id'],
         user_id = current_user.id,
-        created_at = datetime.date.today()
+        created_at = datetime.datetime.now()
     )
 
     db.add(new_playlist)

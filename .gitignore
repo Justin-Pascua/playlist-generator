@@ -5,6 +5,7 @@ __pycache__/
 .env_dev
 client_secret*
 token.pickle
+token.json
 
 datasets/
 demo.ipynb

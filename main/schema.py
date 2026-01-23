@@ -89,6 +89,13 @@ class SongSummary(SongResponseBase):
     song_link: Optional[str] | None = None
     alt_names: Optional[List[str | None]] = [None]
 
+# PLAYLIST
+class PlaylistResponse(BaseModel):
+    id: str
+    playlist_title: str
+    link: str
+    created_at: datetime
+
 class PlaylistCreate(BaseModel):
     title: str
     privacy_status: Literal["public", "private", "unlisted"] = "private"
