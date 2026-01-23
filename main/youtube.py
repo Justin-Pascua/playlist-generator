@@ -86,7 +86,7 @@ def get_playlist_items(playlist_id: str, yt_service: Resource = Depends(get_yt_s
     )
     response = request.execute()
 
-    return response
+    return response['items']
 
 def delete_playlist(playlist_id: str, yt_service: Resource = Depends(get_yt_service)):
     request = yt_service.playlists().delete(
@@ -116,8 +116,11 @@ def insert_video_in_playlist(playlist_id: str, video_id: str,
     return response
 
 def delete_playlist_item(item_id: str, yt_service: Resource = Depends(get_yt_service)):
-
-    pass
+    request = yt_service.playlistItems().delete(
+        id = item_id
+    )
+    response = request.execute()
+    return response
 
 def delete_playlist_item_at_pos(playlist_id: str, pos: int, 
                                 yt_service: Resource = Depends(get_yt_service)):
@@ -133,3 +136,4 @@ def move_playlist_item(playlist_id: str, init_pos: int, target_pos: int,
                        yt_service: Resource = Depends(get_yt_service)):
 
     pass
+

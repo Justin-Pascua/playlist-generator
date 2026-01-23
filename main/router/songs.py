@@ -160,14 +160,14 @@ async def delete_song(id: int,
     return Response(status_code = status.HTTP_204_NO_CONTENT)
 
 # VIDEOS
-@router.put("/{id}/video")
-async def upsert_video(id: int, new_video: VideoCreate,
+@router.put("/{canonical_id}/video")
+async def upsert_video(canonical_id: int, new_video: VideoCreate,
                       db: Session = Depends(get_db),
                       current_user = Depends(oauth2.get_current_user)):
     """
     Create or replace video associated to canonical title
     """
-    song = db.scalar(select(Canonical).where(Canonical.id == id))
+    song = db.scalar(select(Canonical).where(Canonical.id == canonical_id))
     if not song:
         raise HTTPException(status_code = status.HTTP_404_NOT_FOUND,
                             detail = f"Song not found")
@@ -177,7 +177,7 @@ async def upsert_video(id: int, new_video: VideoCreate,
                             detail = f"You do not have access to this song")
     
     video = db.scalar(select(Video)
-                     .where(Video.canonical_name_id == id)
+                     .where(Video.canonical_name_id == canonical_id)
                      .where(Video.user_id == current_user.id))
     
     root = 'http://youtu.be/'
@@ -190,7 +190,7 @@ async def upsert_video(id: int, new_video: VideoCreate,
     else:
         video = Video(
             id = new_video.id,
-            canonical_name_id = id, 
+            canonical_name_id = canonical_id, 
             user_id = current_user.id, 
             link = root + new_video.id)
         db.add(video)
@@ -200,14 +200,14 @@ async def upsert_video(id: int, new_video: VideoCreate,
 
     return video
 
-@router.get("/{id}/video", response_model = VideoResponse)
-async def get_video(id: int,
+@router.get("/{canonical_id}/video", response_model = VideoResponse)
+async def get_video(canonical_id: int,
                    db: Session = Depends(get_db),
                    current_user = Depends(oauth2.get_current_user)):
     """
     Get video info for a song
     """
-    song = db.scalar(select(Canonical).where(Canonical.id == id))
+    song = db.scalar(select(Canonical).where(Canonical.id == canonical_id))
     if not song:
         raise HTTPException(status_code = status.HTTP_404_NOT_FOUND,
                             detail = f"Song not found")
@@ -216,7 +216,7 @@ async def get_video(id: int,
         raise HTTPException(status_code = status.HTTP_403_FORBIDDEN,
                             detail = f"You do not have access to this song")
     
-    result = db.scalar(select(Video).where(Video.canonical_name_id == id))
+    result = db.scalar(select(Video).where(Video.canonical_name_id == canonical_id))
 
     if not result:
         raise HTTPException(status_code = status.HTTP_404_NOT_FOUND,
@@ -224,15 +224,15 @@ async def get_video(id: int,
     
     return result
 
-@router.delete("/{id}/video")
-async def delete_video(id: int,
+@router.delete("/{canonical_id}/video")
+async def delete_video(canonical_id: int,
                       db: Session = Depends(get_db),
                       current_user = Depends(oauth2.get_current_user)):
     """
     Delete video item from database
     """
 
-    song = db.scalar(select(Canonical).where(Canonical.id == id))
+    song = db.scalar(select(Canonical).where(Canonical.id == canonical_id))
     if not song:
         raise HTTPException(status_code = status.HTTP_404_NOT_FOUND,
                             detail = f"Song not found")
@@ -240,7 +240,7 @@ async def delete_video(id: int,
         raise HTTPException(status_code = status.HTTP_403_FORBIDDEN,
                             detail = f"You do not have access to this song")
     
-    video = db.scalar(select(Video).where(Video.canonical_name_id == id))
+    video = db.scalar(select(Video).where(Video.canonical_name_id == canonical_id))
     if not video:
         raise HTTPException(status_code = status.HTTP_404_NOT_FOUND,
                             detail = f"Link not found")
