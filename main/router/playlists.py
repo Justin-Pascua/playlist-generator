@@ -55,14 +55,18 @@ async def create_playlist(payload: PlaylistCreate, db: Session = Depends(get_db)
                           yt_service: Resource = Depends(youtube.get_yt_service),
                           current_user = Depends(oauth2.get_current_user)):
     # create blank playlist through YT API
-    response = youtube.create_blank_playlist(payload, yt_service)
+    playlist_editor = youtube.PlaylistEditor(
+        mode = 'create_new', 
+        title = payload.title,
+        privacy_status = payload.privacy_status,
+        yt_service = yt_service
+    )
 
     # record playlist details in database
-    root = "https://youtube.com/playlist?list="
     new_playlist = Playlist(
-        id = response['id'],
+        id = playlist_editor.id,
         playlist_title = payload.title,
-        link = root + response['id'],
+        link = playlist_editor.link,
         user_id = current_user.id,
         created_at = datetime.datetime.now()
     )
