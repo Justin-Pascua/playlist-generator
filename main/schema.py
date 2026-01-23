@@ -66,6 +66,8 @@ class VideoCreate(BaseModel):
     User input for inserting a song link
     """
     id: str
+    video_title: str
+    channel_name: str
 
 class VideoResponse(BaseModel):
     """
@@ -87,7 +89,7 @@ class SongSummary(SongResponseBase):
     """
     API response for sending song details
     """
-    song_link: Optional[str] | None = None
+    link: Optional[str] | None = None
     alt_names: Optional[List[str | None]] = [None]
 
 # PLAYLIST

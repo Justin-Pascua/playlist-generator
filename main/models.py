@@ -58,6 +58,8 @@ class Video(Base):
     canonical_name_id: Mapped[int] = mapped_column(ForeignKey("canonical_names.id", ondelete = "CASCADE"), unique = True, nullable = False)
     link: Mapped[str] = mapped_column(String(64), nullable = False)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete = "CASCADE"), nullable = False)
+    video_title: Mapped[str] = mapped_column(String(128), nullable = False)
+    channel_name: Mapped[str] = mapped_column(String(128), nullable = False)
 
     title = relationship("Canonical", back_populates = "video")
     user = relationship("User", back_populates = "videos")

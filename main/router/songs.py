@@ -32,7 +32,7 @@ async def get_all_songs(get_links: bool = False, get_alts: bool = False,
     # choose fields to fetch
     select_cols = [Canonical.title.label("title"), Canonical.id.label("id")]
     if get_links:
-        select_cols.append(Video.link.label("song_link"))
+        select_cols.append(Video.link.label("link"))
     if get_alts:
         select_cols.append(func.json_arrayagg(AltName.title).cast(JSON).label("alt_names"))
 
@@ -64,7 +64,7 @@ async def get_song(id: int,
         Canonical.title.label('title'),
         Canonical.id.label('id'),
         Canonical.user_id.label('user_id'),
-        Video.link.label("song_link"),
+        Video.link.label("link"),
         func.json_arrayagg(AltName.title).label("alt_names").cast(JSON).label("alt_names")
         )
         .where(Canonical.id == id)
@@ -220,7 +220,7 @@ async def get_video(canonical_id: int,
 
     if not result:
         raise HTTPException(status_code = status.HTTP_404_NOT_FOUND,
-                            detail = f"No link found")
+                            detail = f"No video found")
     
     return result
 
@@ -243,10 +243,10 @@ async def delete_video(canonical_id: int,
     video = db.scalar(select(Video).where(Video.canonical_name_id == canonical_id))
     if not video:
         raise HTTPException(status_code = status.HTTP_404_NOT_FOUND,
-                            detail = f"Link not found")
+                            detail = f"Video not found")
     if video.user_id != current_user.id:
         raise HTTPException(status_code = status.HTTP_403_FORBIDDEN,
-                            detail = f"You do not have access to this link")
+                            detail = f"You do not have access to this video")
     
     db.delete(video)
     db.commit()
