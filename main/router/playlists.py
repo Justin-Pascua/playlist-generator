@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
 from googleapiclient.discovery import Resource
+from googleapiclient.errors import HttpError
 
 from typing import Literal, List
 import datetime
@@ -53,26 +54,11 @@ async def get_playlist(id: str, db: Session = Depends(get_db),
 async def create_playlist(payload: PlaylistCreate, db: Session = Depends(get_db),
                           yt_service: Resource = Depends(youtube.get_yt_service),
                           current_user = Depends(oauth2.get_current_user)):
-    # user should pass a date and a list of song strings
-    # query db to check for matches
-    # for all matches, get links
-    # for all non-matches, 
-    #   - search YouTube API
-    #   - get link to top result (might need to think about this more carefully later)
-    # 
-    # gather all links and send request to YouTube API to create a playlist
-    # add links and titles of unknown songs to database
-
-    # request = yt_service.playlists().insert(
-    #     part = "id,snippet,status",
-    #     body = {"snippet": {"title": payload.title},
-    #             "status": {"privacyStatus": payload.privacy_status}
-    #             })
-    # response = request.execute()
+    # create blank playlist through YT API
     response = youtube.create_blank_playlist(payload, yt_service)
 
+    # record playlist details in database
     root = "https://youtube.com/playlist?list="
-
     new_playlist = Playlist(
         id = response['id'],
         playlist_title = payload.title,
@@ -82,7 +68,6 @@ async def create_playlist(payload: PlaylistCreate, db: Session = Depends(get_db)
     )
 
     db.add(new_playlist)
-
     try:
         db.commit()
     except Exception as e:
@@ -92,10 +77,7 @@ async def create_playlist(payload: PlaylistCreate, db: Session = Depends(get_db)
     db.refresh(new_playlist)
     return new_playlist
 
-
-    return 
-
-@router.post("/playlists/{id}")
+@router.patch("/{id}")
 async def edit_playlist():
     # allow user to add, remove, replace, or change order of videos in playlist
     # add query param that indicates whether or not to reflect those changes in the song preference database
@@ -103,16 +85,30 @@ async def edit_playlist():
 
 @router.delete("/{id}")
 async def delete_playlist(id: str, db: Session = Depends(get_db),
+                          yt_service: Resource = Depends(youtube.get_yt_service),
                           current_user = Depends(oauth2.get_current_user)):
-    playlist = db.scalar(select(Playlist).where(Playlist.id == id))
-    if not playlist:
-        raise HTTPException(status_code = status.HTTP_404_NOT_FOUND,
-                            detail = f"Playlist not found")
-    if playlist.user_id != current_user.id:
-        raise HTTPException(status_code = status.HTTP_403_FORBIDDEN,
-                            detail = f"You do not have access to this playlist")
+    # delete playlist on YouTube through YT API
+    try:
+        response = youtube.delete_playlist(id, yt_service)
     
-    db.delete(playlist)
-    db.commit()
+    # if YT API throws error, convert to Exception type native to FastAPI
+    except HttpError as e:
+        raise HTTPException(status_code = e.status_code,
+                            detail = e.error_details[0]['message'])
+    
+    # even if error occurs with YT API, 
+    # we still want to delete our representation of the playlist in our database
+    finally:
+        playlist = db.scalar(select(Playlist).where(Playlist.id == id))
+        if not playlist:
+            raise HTTPException(status_code = status.HTTP_404_NOT_FOUND,
+                                detail = f"Playlist not found")
+        if playlist.user_id != current_user.id:
+            raise HTTPException(status_code = status.HTTP_403_FORBIDDEN,
+                                detail = f"You do not have access to this playlist")
+        
+        db.delete(playlist)
+        db.commit()
 
-    return Response(status_code = status.HTTP_204_NO_CONTENT)
+        return Response(status_code = status.HTTP_204_NO_CONTENT)
+    
