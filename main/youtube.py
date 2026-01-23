@@ -4,12 +4,13 @@ from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import Resource, build
 
-from .config import settings
-
 from typing import Literal
 import os
 import ast
 import pickle
+
+from .config import settings
+from .schema import PlaylistCreate
 
 API_KEY = settings.YT_API_KEY
 TOKEN_PATH = "token.json"
@@ -43,7 +44,13 @@ def get_yt_service():
     finally:
         yt_service.close()
 
-def create_blank_playlist(title: str,
-                          privacy_status: Literal["public", "private", "unlisted"] = "private",
+def create_blank_playlist(payload: PlaylistCreate,
                           yt_service: Resource = Depends(get_yt_service)):
-    pass
+    request = yt_service.playlists().insert(
+        part = "id,snippet,status",
+        body = {"snippet": {"title": payload.title},
+                "status": {"privacyStatus": payload.privacy_status}
+                })
+    response = request.execute()
+
+    return response
