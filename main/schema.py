@@ -74,6 +74,8 @@ class VideoResponse(BaseModel):
     API response for sending song link
     """
     id: str
+    video_title: str
+    channel_name: str
     link: str
 
 

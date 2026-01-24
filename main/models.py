@@ -33,11 +33,9 @@ class AltName(Base):
     canonical_title = relationship("Canonical", back_populates = "alt_names")
     user = relationship("User", back_populates = "alt_names")
 
-    # a user can have multiple alt names for a given song
-    # multiple users can have the same alt name for a given song
-    # but, a user cannot assign multiple copies of the same alt name to a given song
+    # a user cannot assign the same alt name to multiple songs
     __table_args__ = (
-        UniqueConstraint("title", "canonical_id", "user_id", name = "alt_canonical_user_triple"),
+        UniqueConstraint("title", "user_id", name = "alt_and_user"),
     )
 
 class Playlist(Base):

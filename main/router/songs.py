@@ -160,10 +160,11 @@ async def delete_song(id: int,
     return Response(status_code = status.HTTP_204_NO_CONTENT)
 
 # VIDEOS
-@router.put("/{canonical_id}/video")
+@router.put("/{canonical_id}/video", response_model = VideoResponse)
 async def upsert_video(canonical_id: int, new_video: VideoCreate,
-                      db: Session = Depends(get_db),
-                      current_user = Depends(oauth2.get_current_user)):
+                       response: Response,
+                       db: Session = Depends(get_db),
+                       current_user = Depends(oauth2.get_current_user)):
     """
     Create or replace video associated to canonical title
     """
@@ -186,14 +187,23 @@ async def upsert_video(canonical_id: int, new_video: VideoCreate,
     if video:
         video.id = new_video.id
         video.link = root + new_video.id
+        video.video_title = new_video.video_title
+        video.channel_name = new_video.channel_name
+
+        response.status_code = status.HTTP_200_OK
     # otherwise, insert into db
     else:
         video = Video(
             id = new_video.id,
             canonical_name_id = canonical_id, 
-            user_id = current_user.id, 
-            link = root + new_video.id)
+            link = root + new_video.id, 
+            user_id = current_user.id,
+            video_title = new_video.video_title,
+            channel_name = new_video.video_title
+            )
         db.add(video)
+        
+        response.status_code = status.HTTP_201_CREATED
 
     db.commit()
     db.refresh(video)

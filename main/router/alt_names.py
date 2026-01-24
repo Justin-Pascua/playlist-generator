@@ -45,7 +45,7 @@ async def create_alt_name(new_alt: AltNameCreate,
     except IntegrityError as e:
         db.rollback()
         raise HTTPException(status_code = status.HTTP_409_CONFLICT, 
-                            detail = "Given alt name is already assigned to the specified song")
+                            detail = "Alt name already exists")
 
     db.refresh(created_alt)
     
