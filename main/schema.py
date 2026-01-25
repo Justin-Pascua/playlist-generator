@@ -60,7 +60,7 @@ class AltNameResponse(BaseModel):
     title: str
     canonical_id: int
 
-# SONG LINK
+# VIDEO
 class VideoCreate(BaseModel):
     """
     User input for inserting a song link
@@ -80,6 +80,9 @@ class VideoResponse(BaseModel):
 
 
 # FULL SONG RESOURCE
+class SongCreate(CanonicalCreate):
+    pass
+
 class SongResponseBase(BaseModel):
     """
     API response for sending song titles

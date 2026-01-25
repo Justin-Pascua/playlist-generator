@@ -8,7 +8,7 @@ from sqlalchemy.dialects.mysql import JSON
 from typing import List, Optional
 
 from ..database import get_db
-from ..schema import (SongSummary,
+from ..schema import (SongSummary, SongCreate,
                       CanonicalCreate, CanonicalUpdate, 
                       AltNameCreate, AltNameResponse, AltNameUpdate, 
                       VideoCreate, VideoResponse)
@@ -87,26 +87,48 @@ async def get_song(id: int,
 
     return result
 
-# CANONICAL NAMES
-@router.post("/", status_code = status.HTTP_201_CREATED)
-async def create_song(new_canonical: CanonicalCreate, 
+@router.post("/", status_code = status.HTTP_201_CREATED, response_model = SongSummary, response_model_exclude_defaults = True)
+async def create_song(new_song: SongCreate, 
                       db: Session = Depends(get_db),
                       current_user = Depends(oauth2.get_current_user)):
     """
-    Inserts a song title into the canonical_names table
+    Inserts a song title into the canonical_names table and alt_names table
     """
-    created_canonical = Canonical(user_id = current_user.id, **new_canonical.model_dump())
-    db.add(created_canonical)
-    try:
-        db.commit()
-    except IntegrityError:
-        db.rollback()
-        raise HTTPException(status_code = status.HTTP_409_CONFLICT, 
-                            detail = "Song already exists in your database")
+    # check that title doesn't already exist as either a canonical name or alt name
+    stmt = (select(Canonical.title)
+            .where(Canonical.title == new_song.title)
+            .where(Canonical.user_id == current_user.id))
+    result = db.execute(stmt).scalar()
+    if result:
+        raise HTTPException(status_code = status.HTTP_409_CONFLICT,
+                            detail = "Provided name already exists in canonical_names")
     
-    db.refresh(created_canonical)
-    return created_canonical
+    stmt = (select(AltName.title)
+            .where(AltName.title == new_song.title)
+            .where(AltName.user_id == current_user.id))
+    result = db.execute(stmt).scalar()
+    if result:
+        raise HTTPException(status_code = status.HTTP_409_CONFLICT,
+                            detail = "Provided name already exists in alt_names")
 
+    # if no conflicts, then can safely add title to both canonical_names and alt_names
+    created_canonical = Canonical(user_id = current_user.id, **new_song.model_dump())
+    db.add(created_canonical)
+    db.commit()
+    db.refresh(created_canonical)
+
+    created_alt = AltName(user_id = current_user.id, canonical_id = created_canonical.id, **new_song.model_dump())
+    db.add(created_alt)
+    db.commit()
+    db.refresh(created_alt)
+
+    response = {'id': created_canonical.id,
+                'title': created_canonical.title,
+                'alt_names': [created_alt.title]}
+
+    return response
+
+# CANONICAL NAMES
 @router.patch("/{id}")
 async def update_canonical_name(id: int,
                                 new_canonical: CanonicalUpdate,
