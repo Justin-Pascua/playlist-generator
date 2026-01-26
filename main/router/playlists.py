@@ -11,7 +11,7 @@ from typing import Literal, List
 import datetime
 
 from ..database import get_db
-from ..schema import PlaylistCreate, PlaylistResponse
+from ..schema import PlaylistCreate, PlaylistResponse, PlaylistItemRemoveRequest, PlaylistItemInsertRequest, PlaylistItemMoveRequest, PlaylistItemReplaceRequest, PlaylistEditRequest
 from ..models import Playlist
 from .. import oauth2, youtube
 
@@ -82,9 +82,8 @@ async def create_playlist(payload: PlaylistCreate, db: Session = Depends(get_db)
     return new_playlist
 
 @router.patch("/{id}")
-async def edit_playlist():
-    # allow user to add, remove, replace, or change order of videos in playlist
-    # add query param that indicates whether or not to reflect those changes in the song preference database
+async def edit_playlist_title():
+    
     return {"message": "editted playlist"}
 
 @router.delete("/{id}")
@@ -115,4 +114,27 @@ async def delete_playlist(id: str, db: Session = Depends(get_db),
         db.commit()
 
         return Response(status_code = status.HTTP_204_NO_CONTENT)
+
+@router.patch("/{id}/items")
+async def edit_playlist_item(id: str,
+                             details: PlaylistItemRemoveRequest, 
+                             db: Session = Depends(get_db),
+                             yt_service: Resource = Depends(youtube.get_yt_service),
+                             current_user = Depends(oauth2.get_current_user)):
+    """
+    Insert, replace, or move video within a playlist
+    """
     
+
+    pass
+
+@router.delete("/{id}/items")
+async def remove_playlist_item(id: str,
+                               details: PlaylistItemRemoveRequest, 
+                               db: Session = Depends(get_db),
+                               yt_service: Resource = Depends(youtube.get_yt_service),
+                               current_user = Depends(oauth2.get_current_user)):
+    """
+    Remove a video within a specified playlist
+    """
+    pass

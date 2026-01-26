@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Response, status, HTTPException, Depends, APIRouter
 
-from sqlalchemy import select, func
+from sqlalchemy import select, update, func
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.dialects.mysql import JSON
@@ -8,7 +8,7 @@ from sqlalchemy.dialects.mysql import JSON
 from typing import List, Optional
 
 from ..database import get_db
-from ..schema import (SongSummary, SongCreate,
+from ..schema import (SongSummary, SongCreate, SongMergeRequest, SongSplinterRequest,
                       CanonicalCreate, CanonicalUpdate, 
                       AltNameCreate, AltNameResponse, AltNameUpdate, 
                       VideoCreate, VideoResponse)
@@ -128,6 +128,149 @@ async def create_song(new_song: SongCreate,
 
     return response
 
+# NEED TO TEST THIS
+@router.post("/merges", status_code = status.HTTP_200_OK, response_model = SongSummary)
+async def merge_songs(merge_details: SongMergeRequest,
+                      db: Session = Depends(get_db),
+                      current_user = Depends(oauth2.get_current_user)):
+    
+    # throw exception if too many elements provided in canonical_ids field 
+    # this is done to protect the system against adversial calls and clumsy users from themselves 
+    if len(merge_details.canonical_ids) > 5:
+        raise HTTPException(status_code = status.HTTP_422_UNPROCESSABLE_CONTENT,
+                            detail = {
+                                "message": "At most 5 ids can be provided at once",
+                                "max_allowed": 5,
+                                "provided": len(merge_details)
+                            })
+    
+    # check that each song exists and that user has access
+    for id in merge_details.canonical_ids:
+        result = db.execute(select(Canonical.id).where(Canonical.id == id)).first()
+        if not result:
+            raise HTTPException(status_code = status.HTTP_404_NOT_FOUND,
+                                detail = {
+                                    "message": "Song not found",
+                                    "invalid_id": id
+                                })
+        
+        if result.user_id != current_user.id:
+            raise HTTPException(status_code = status.HTTP_403_FORBIDDEN,
+                                detail = {
+                                    "message": "You do not have access to this song",
+                                    "invalid_id": id
+                                })
+    
+    # remove id of main song from list of ids for cleaner logic in the following operations
+    if merge_details.priority_id in merge_details.canonical_ids:
+        # not using .remove() in case there are multiple instances that need to be removed
+        merge_details.canonical_ids = [id for id in merge_details.canonical_ids if id != merge_details.priority_id]
+
+    # reassign alt names to all point to canonical_title of main song
+    stmt = (update(AltName)
+            .where(AltName.canonical_id.in_(merge_details.canonical_ids))
+            .values(canonical_id = merge_details.priority_id))
+    db.execute(stmt)
+    # db.commit()
+
+    # delete canonical name of side
+    song = db.scalar(select(Canonical).where(Canonical.id.in_(merge_details.canonical_ids)))
+    db.delete(song)
+    # db.commit()
+
+    # delete video of side
+    video = db.scalar(select(Video).where(Video.canonical_name_id.in_(merge_details.canonical_ids)))
+    db.delete(video)
+    db.commit()
+    
+    stmt = (select(
+        Canonical.title.label("title"),
+        Video.link.label("song_link"),
+        func.json_arrayagg(AltName.title).label("alt_names")
+        )
+        .where(Canonical.id == 16)
+        .join(Video, Canonical.id == Video.canonical_name_id, isouter = True)
+        .join(AltName, Canonical.id == AltName.canonical_id, isouter = True)
+        .group_by(Canonical.id, Canonical.title, Video.link))
+    
+    result = db.execute(stmt).first()
+
+    return result
+
+@router.post("/splinters", status_code = status.HTTP_201_CREATED, response_model = SongSummary)
+async def splinter_song(splinter_details: SongSplinterRequest,
+                        db: Session = Depends(get_db),
+                        current_user = Depends(oauth2.get_current_user)):
+    # take an alt name of a specified song, and turn it into its own song
+    stmt = (select(AltName.id, 
+               AltName.user_id,
+               AltName.canonical_id,
+               AltName.title.label('title'),
+               Canonical.title.label('canonical_title'),)
+            .join(Canonical, Canonical.id == AltName.canonical_id)
+            .where(AltName.id == splinter_details.alt_name_id))
+    current_alt_name = db.execute(stmt).scalars().first()
+
+    if not current_alt_name:
+        raise HTTPException(status_code = status.HTTP_404_NOT_FOUND,
+                            detail = "Specified alt name does not exist")
+    
+    if current_alt_name.user_id != current_user.id:
+        raise HTTPException(status_code = status.HTTP_403_FORBIDDEN,
+                            detail = "You do not have access to this alt name")
+
+    # do not allow splintering if specified alt name is same as the canonical name it points to
+    if current_alt_name.title == current_alt_name.canonical_title:
+        raise HTTPException(status_code = status.HTTP_409_CONFLICT,
+                            detail = "Cannot splinter this alt name because it is the canonical name of the overlying song resource")
+    
+
+    new_canonical = Canonical(title = current_alt_name.title, user_id = current_user.id)
+    db.add(new_canonical)
+    
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code = status.HTTP_409_CONFLICT,
+                            detail = "This alt name already exists as a canonical name")
+    
+    db.refresh(new_canonical)
+
+    updated_alt_name = db.scalar(select(AltName).where(AltName.id == id))
+    updated_alt_name.canonical_id = new_canonical.id
+    
+    db.commit()
+
+    response = {
+        "id": new_canonical.id,
+        "title": new_canonical.title,
+        "alt_names": [updated_alt_name.title]
+    }
+    
+    return response
+
+@router.delete("/{id}", status_code = status.HTTP_204_NO_CONTENT)
+async def delete_song(id: int,
+                      db: Session = Depends(get_db),
+                      current_user = Depends(oauth2.get_current_user)):
+    """
+    Delete a song, including its alternate titles and song link
+    """
+    song = db.scalar(select(Canonical).where(Canonical.id == id))
+    if not song:
+        raise HTTPException(status_code = status.HTTP_404_NOT_FOUND,
+                            detail = f"Song not found")
+    
+    if song.user_id != current_user.id:
+        raise HTTPException(status_code = status.HTTP_403_FORBIDDEN,
+                            detail = f"You do not have access to this song") 
+
+    db.delete(song)
+    db.commit()
+
+    return Response(status_code = status.HTTP_204_NO_CONTENT)
+
 # CANONICAL NAMES
 @router.patch("/{id}")
 async def update_canonical_name(id: int,
@@ -159,27 +302,6 @@ async def update_canonical_name(id: int,
     
     db.refresh(song)
     return song
-
-@router.delete("/{id}", status_code = status.HTTP_204_NO_CONTENT)
-async def delete_song(id: int,
-                      db: Session = Depends(get_db),
-                      current_user = Depends(oauth2.get_current_user)):
-    """
-    Delete a song, including its alternate titles and song link
-    """
-    song = db.scalar(select(Canonical).where(Canonical.id == id))
-    if not song:
-        raise HTTPException(status_code = status.HTTP_404_NOT_FOUND,
-                            detail = f"Song not found")
-    
-    if song.user_id != current_user.id:
-        raise HTTPException(status_code = status.HTTP_403_FORBIDDEN,
-                            detail = f"You do not have access to this song") 
-
-    db.delete(song)
-    db.commit()
-
-    return Response(status_code = status.HTTP_204_NO_CONTENT)
 
 # VIDEOS
 @router.put("/{canonical_id}/video", response_model = VideoResponse)

@@ -1,4 +1,4 @@
-from typing import List, Optional, Literal
+from typing import List, Optional, Literal, Tuple
 from pydantic import BaseModel, EmailStr
 from datetime import datetime
 
@@ -81,6 +81,9 @@ class VideoResponse(BaseModel):
 
 # FULL SONG RESOURCE
 class SongCreate(CanonicalCreate):
+    """
+    User input for creating a new song resource (same as CanonicalCreate)
+    """
     pass
 
 class SongResponseBase(BaseModel):
@@ -92,18 +95,75 @@ class SongResponseBase(BaseModel):
 
 class SongSummary(SongResponseBase):
     """
-    API response for sending song details
+    API response for sending additional song details
     """
     link: Optional[str] | None = None
     alt_names: Optional[List[str | None]] = [None]
 
+class SongMergeRequest(BaseModel):
+    """
+    User input for merging songs
+    """
+    canonical_ids: List[int]        # identifies song to merge
+    priority_id: int                # identifies which song takes priority for canonical_name and video
+
+class SongSplinterRequest(BaseModel):
+    """
+    user input for splintering a song with a target alt name
+    """
+    alt_name_id: int 
+
 # PLAYLIST
 class PlaylistResponse(BaseModel):
+    """
+    API response after creating a playlist 
+    """
     id: str
     playlist_title: str
     link: str
     created_at: datetime
 
 class PlaylistCreate(BaseModel):
+    """
+    User input for creating a playlist
+    """
     title: str
     privacy_status: Literal["public", "private", "unlisted"] = "private"
+
+class PlaylistItemInsertRequest(BaseModel):
+    """
+    User input for inserting item into a playlist
+    """
+    playlist_id: str
+    video_id: str
+    pos: int | None = None
+
+class PlaylistItemReplaceRequest(BaseModel):
+    """
+    User input for replacing a video inside a playlist
+    """
+    playlist_id: str
+    video_id: str
+    pos: int
+
+class PlaylistItemMoveRequest(BaseModel):
+    """
+    User input for changing a video's position within a playlist
+    """
+    playlist_id: str
+    init_pos: int
+    target_pos: int
+
+class PlaylistEditRequest(BaseModel):
+    """
+    User input for editing a playlist
+    """
+    mode: Literal["Insert", "Replace", "Move"]
+    details: PlaylistItemInsertRequest | PlaylistItemReplaceRequest | PlaylistItemMoveRequest 
+
+class PlaylistItemRemoveRequest(BaseModel):
+    """
+    User input for removing a video from a playlist
+    """
+    playlist_id: str
+    pos: int
