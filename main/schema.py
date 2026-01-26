@@ -98,7 +98,7 @@ class SongSummary(SongResponseBase):
     API response for sending additional song details
     """
     link: Optional[str] | None = None
-    alt_names: Optional[List[str | None]] = [None]
+    alt_names: Optional[List[SongResponseBase | None]] = [None]
 
 class SongMergeRequest(BaseModel):
     """

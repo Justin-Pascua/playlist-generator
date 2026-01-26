@@ -34,7 +34,15 @@ async def get_all_songs(get_links: bool = False, get_alts: bool = False,
     if get_links:
         select_cols.append(Video.link.label("link"))
     if get_alts:
-        select_cols.append(func.json_arrayagg(AltName.title).cast(JSON).label("alt_names"))
+        select_cols.append(func.coalesce(
+                func.JSON_ARRAYAGG(
+                    func.JSON_OBJECT(
+                        "id", AltName.id,
+                        "title", AltName.title,
+                    )
+                ),
+                func.cast("[]", JSON),
+            ).label("alt_names"),)
 
     # build query statement
     stmt = select(*select_cols).where(Canonical.user_id == current_user.id)
@@ -65,7 +73,15 @@ async def get_song(id: int,
         Canonical.id.label('id'),
         Canonical.user_id.label('user_id'),
         Video.link.label("link"),
-        func.json_arrayagg(AltName.title).label("alt_names").cast(JSON).label("alt_names")
+        func.coalesce(
+                func.JSON_ARRAYAGG(
+                    func.JSON_OBJECT(
+                        "id", AltName.id,
+                        "title", AltName.title,
+                    )
+                ),
+                func.cast("[]", JSON),
+            ).label("alt_names"),
         )
         .where(Canonical.id == id)
         .join(Video, Canonical.id == Video.canonical_name_id, isouter = True)
@@ -124,11 +140,11 @@ async def create_song(new_song: SongCreate,
 
     response = {'id': created_canonical.id,
                 'title': created_canonical.title,
-                'alt_names': [created_alt.title]}
+                'alt_names': [{'id': created_alt.id, 'title': created_alt.title}]
+                }
 
     return response
 
-# NEED TO TEST THIS
 @router.post("/merges", status_code = status.HTTP_200_OK, response_model = SongSummary)
 async def merge_songs(merge_details: SongMergeRequest,
                       db: Session = Depends(get_db),
@@ -146,7 +162,7 @@ async def merge_songs(merge_details: SongMergeRequest,
     
     # check that each song exists and that user has access
     for id in merge_details.canonical_ids:
-        result = db.execute(select(Canonical.id).where(Canonical.id == id)).first()
+        result = db.execute(select(Canonical).where(Canonical.id == id)).scalars().first()
         if not result:
             raise HTTPException(status_code = status.HTTP_404_NOT_FOUND,
                                 detail = {
@@ -171,24 +187,35 @@ async def merge_songs(merge_details: SongMergeRequest,
             .where(AltName.canonical_id.in_(merge_details.canonical_ids))
             .values(canonical_id = merge_details.priority_id))
     db.execute(stmt)
-    # db.commit()
+    db.commit()
 
     # delete canonical name of side
     song = db.scalar(select(Canonical).where(Canonical.id.in_(merge_details.canonical_ids)))
     db.delete(song)
-    # db.commit()
+    db.commit()
 
     # delete video of side
     video = db.scalar(select(Video).where(Video.canonical_name_id.in_(merge_details.canonical_ids)))
-    db.delete(video)
-    db.commit()
+    if video:
+        db.delete(video)
+        db.commit()
     
     stmt = (select(
-        Canonical.title.label("title"),
-        Video.link.label("song_link"),
-        func.json_arrayagg(AltName.title).label("alt_names")
+        Canonical.title.label('title'),
+        Canonical.id.label('id'),
+        Canonical.user_id.label('user_id'),
+        Video.link.label("link"),
+        func.coalesce(
+                func.JSON_ARRAYAGG(
+                    func.JSON_OBJECT(
+                        "id", AltName.id,
+                        "title", AltName.title,
+                    )
+                ),
+                func.cast("[]", JSON),
+            ).label("alt_names"),
         )
-        .where(Canonical.id == 16)
+        .where(Canonical.id == merge_details.priority_id)
         .join(Video, Canonical.id == Video.canonical_name_id, isouter = True)
         .join(AltName, Canonical.id == AltName.canonical_id, isouter = True)
         .group_by(Canonical.id, Canonical.title, Video.link))
@@ -209,7 +236,7 @@ async def splinter_song(splinter_details: SongSplinterRequest,
                Canonical.title.label('canonical_title'),)
             .join(Canonical, Canonical.id == AltName.canonical_id)
             .where(AltName.id == splinter_details.alt_name_id))
-    current_alt_name = db.execute(stmt).scalars().first()
+    current_alt_name = db.execute(stmt).first()
 
     if not current_alt_name:
         raise HTTPException(status_code = status.HTTP_404_NOT_FOUND,
@@ -237,7 +264,7 @@ async def splinter_song(splinter_details: SongSplinterRequest,
     
     db.refresh(new_canonical)
 
-    updated_alt_name = db.scalar(select(AltName).where(AltName.id == id))
+    updated_alt_name = db.scalar(select(AltName).where(AltName.id == splinter_details.alt_name_id))
     updated_alt_name.canonical_id = new_canonical.id
     
     db.commit()
@@ -245,7 +272,7 @@ async def splinter_song(splinter_details: SongSplinterRequest,
     response = {
         "id": new_canonical.id,
         "title": new_canonical.title,
-        "alt_names": [updated_alt_name.title]
+        "alt_names": [{'id': updated_alt_name.id, 'title': updated_alt_name.title}]
     }
     
     return response
