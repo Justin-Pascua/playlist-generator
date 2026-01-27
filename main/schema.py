@@ -134,6 +134,13 @@ class PlaylistEdit(BaseModel):
     title: str
     privacy_status: Literal["public", "private", "unlisted", None] = None
 
+class PlaylistItemResponse(BaseModel):
+    kind: str
+    etag: str
+    item_id: str
+    video_id: str
+    title: str
+
 class PlaylistItemInsert(BaseModel):
     """
     User input for inserting item into a playlist
@@ -160,7 +167,7 @@ class PlaylistItemEdit(BaseModel):
     User input for editing a playlist
     """
     mode: Literal["Replace", "Move"]
-    details: PlaylistItemReplace | PlaylistItemMove 
+    sub_details: PlaylistItemReplace | PlaylistItemMove 
 
 class PlaylistItemRemove(BaseModel):
     """

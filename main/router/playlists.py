@@ -14,7 +14,7 @@ from ..database import get_db
 from ..schema import (PlaylistCreate, PlaylistEdit, PlaylistResponse, 
                       PlaylistItemInsert, PlaylistItemRemove, 
                       PlaylistItemMove, PlaylistItemReplace, 
-                      PlaylistItemEdit)
+                      PlaylistItemEdit, PlaylistItemResponse)
 from ..models import Playlist
 from .. import oauth2, youtube
 
@@ -104,7 +104,7 @@ async def edit_playlist(id: str, edit_details: PlaylistEdit,
         request = yt_service.playlists().update(
             part = "id,snippet,status",
             body = {
-                "id": "PLI0PcR8-hKC268jOfxfm5Y3yG68fCJH71",
+                "id": playlist.id,
                 "snippet": {
                     "title": edit_details.title,
                 },
@@ -152,12 +152,36 @@ async def delete_playlist(id: str, db: Session = Depends(get_db),
 
     return Response(status_code = status.HTTP_204_NO_CONTENT)
 
-@router.post("/{id}/items")
-async def insert_playlist_items(id: str,
-                                details: PlaylistItemInsert, 
-                                db: Session = Depends(get_db),
-                                yt_service: Resource = Depends(youtube.get_yt_service),
-                                current_user = Depends(oauth2.get_current_user)):
+@router.get("/{id}/items", response_model = List[PlaylistItemResponse])
+async def get_playlist_items(id: str,
+                             db: Session = Depends(get_db),
+                             yt_service: Resource = Depends(youtube.get_yt_service),
+                             current_user = Depends(oauth2.get_current_user)):
+    # check that playlist exists in db and that user has access to it
+    playlist = db.scalar(select(Playlist).where(Playlist.id == id))
+    if not playlist:
+        raise HTTPException(status_code = status.HTTP_404_NOT_FOUND,
+                            detail = f"Playlist not found")
+    if playlist.user_id != current_user.id:
+        raise HTTPException(status_code = status.HTTP_403_FORBIDDEN,
+                            detail = f"You do not have access to this playlist")
+    
+    # initialize editor
+    try:
+        playlist_editor = youtube.PlaylistEditor(mode = 'from_existing', playlist_id = id, yt_service = yt_service)
+    except Exception as e:
+        raise e
+
+    response = playlist_editor.items
+
+    return response
+
+@router.post("/{id}/items", response_model = PlaylistItemResponse)
+async def insert_video(id: str,
+                       details: PlaylistItemInsert, 
+                       db: Session = Depends(get_db),
+                       yt_service: Resource = Depends(youtube.get_yt_service),
+                       current_user = Depends(oauth2.get_current_user)):
     """
     Insert video into playlist
     """
@@ -170,18 +194,21 @@ async def insert_playlist_items(id: str,
         raise HTTPException(status_code = status.HTTP_403_FORBIDDEN,
                             detail = f"You do not have access to this playlist")
     
+    # initialize editor
     try:
-        playlist_editor = youtube.PlaylistEditor(mode = 'from_existing', playlist_id = id)
+        playlist_editor = youtube.PlaylistEditor(mode = 'from_existing', playlist_id = id, yt_service = yt_service)
     except Exception as e:
         raise e
 
     playlist_editor.insert_video(video_id = details.video_id,
                                  pos = details.pos,
                                  yt_service = yt_service)
+    
+    response = playlist_editor.items[details.pos if details.pos is not None else -1]
 
-    return Response(status_code = status.HTTP_204_NO_CONTENT)
+    return response
 
-@router.patch("/{id}/items")
+@router.patch("/{id}/items", response_model = PlaylistItemResponse)
 async def edit_playlist_item(id: str,
                              details: PlaylistItemEdit, 
                              db: Session = Depends(get_db),
@@ -190,9 +217,34 @@ async def edit_playlist_item(id: str,
     """
     Replace or move video within a playlist
     """
+    # check that playlist exists in db and that user has access to it
+    playlist = db.scalar(select(Playlist).where(Playlist.id == id))
+    if not playlist:
+        raise HTTPException(status_code = status.HTTP_404_NOT_FOUND,
+                            detail = f"Playlist not found")
+    if playlist.user_id != current_user.id:
+        raise HTTPException(status_code = status.HTTP_403_FORBIDDEN,
+                            detail = f"You do not have access to this playlist")
     
+    # initialize editor
+    try:
+        playlist_editor = youtube.PlaylistEditor(mode = 'from_existing', playlist_id = id, yt_service = yt_service)
+    except Exception as e:
+        raise e
+    
+    response = None
+    if details.mode == "Move":
+        playlist_editor.move_video(init_pos = details.sub_details.init_pos, 
+                                   target_pos = details.sub_details.target_pos, 
+                                   yt_service = yt_service)
+        response = playlist_editor.items[details.sub_details.target_pos]
+    elif details.mode == "Replace":
+        playlist_editor.replace_video(video_id = details.sub_details.video_id,
+                                      pos = details.sub_details.pos,
+                                      yt_service = yt_service)
+        response = playlist_editor.items[details.sub_details.pos]
 
-    pass
+    return response
 
 @router.delete("/{id}/items")
 async def remove_playlist_item(id: str,
@@ -203,4 +255,21 @@ async def remove_playlist_item(id: str,
     """
     Remove a video within a specified playlist
     """
-    pass
+    # check that playlist exists in db and that user has access to it
+    playlist = db.scalar(select(Playlist).where(Playlist.id == id))
+    if not playlist:
+        raise HTTPException(status_code = status.HTTP_404_NOT_FOUND,
+                            detail = f"Playlist not found")
+    if playlist.user_id != current_user.id:
+        raise HTTPException(status_code = status.HTTP_403_FORBIDDEN,
+                            detail = f"You do not have access to this playlist")
+    
+    # initialize editor
+    try:
+        playlist_editor = youtube.PlaylistEditor(mode = 'from_existing', playlist_id = id, yt_service = yt_service)
+    except Exception as e:
+        raise e
+    
+    playlist_editor.delete_video(pos = details.pos, yt_service = yt_service)
+
+    return Response(status_code = status.HTTP_204_NO_CONTENT)

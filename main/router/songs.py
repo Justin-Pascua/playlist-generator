@@ -331,7 +331,7 @@ async def update_canonical_name(id: int,
     return song
 
 # VIDEOS
-@router.put("/{canonical_id}/video", response_model = VideoResponse)
+@router.put("/{canonical_id}/videos", response_model = VideoResponse)
 async def upsert_video(canonical_id: int, new_video: VideoCreate,
                        response: Response,
                        db: Session = Depends(get_db),
@@ -381,7 +381,7 @@ async def upsert_video(canonical_id: int, new_video: VideoCreate,
 
     return video
 
-@router.get("/{canonical_id}/video", response_model = VideoResponse)
+@router.get("/{canonical_id}/videos", response_model = VideoResponse)
 async def get_video(canonical_id: int,
                    db: Session = Depends(get_db),
                    current_user = Depends(oauth2.get_current_user)):
@@ -405,7 +405,7 @@ async def get_video(canonical_id: int,
     
     return result
 
-@router.delete("/{canonical_id}/video")
+@router.delete("/{canonical_id}/videos")
 async def delete_video(canonical_id: int,
                       db: Session = Depends(get_db),
                       current_user = Depends(oauth2.get_current_user)):

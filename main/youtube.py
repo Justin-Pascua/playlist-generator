@@ -242,7 +242,34 @@ class PlaylistEditor:
         self.items.pop(pos)
 
     def move_video(self, init_pos: int, target_pos: int, yt_service: Resource = Depends(get_yt_service)):
-        pass
+        for pos in [init_pos, target_pos]:
+            if pos >= len(self.items):
+                raise ValueError(f"pos ({pos}) must be less than length of playlist ({len(self.items)})")
+            if pos < 0:
+                raise ValueError(f"pos ({pos}) must be non-negative")
+
+        item_id = self.items[init_pos]['item_id']
+        video_id = self.items[init_pos]['video_id']
+
+        request = yt_service.playlistItems().update(
+            part = "id,snippet,status",
+            body = {
+                "id": item_id,
+                "snippet": {
+                    "playlistId": self.id,
+                    "resourceId": {
+                        "kind": "youtube#video",
+                        "videoId": video_id
+                    },
+                    "position": target_pos
+                }
+            }
+        )
+        response = request.execute()
+
+        # permute items
+        item = self.items.pop(init_pos)
+        self.items.insert(target_pos, item)
 
     def replace_video(self, video_id: str, pos: int, yt_service: Resource = Depends(get_yt_service)):
         """
