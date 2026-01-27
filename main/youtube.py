@@ -98,7 +98,7 @@ class PlaylistEditor:
         self.title = None   # string title of playlist
         self.link = None    # link to playlist
         self.id = None      # playlist id
-        self.items = None   # list of dicts of form {'kind': ..., 'etag': ..., 'id': ..., 'title': ...}
+        self.items = None   # list of dicts of form {'kind': ..., 'etag': ..., 'item_id': ..., 'video_id': ..., 'title': ...}
 
         if mode == 'create_new':
             self._init_create_new(**kwargs)
@@ -175,7 +175,8 @@ class PlaylistEditor:
         # get relevant items from response
         self.items = [{'kind': item['kind'], 
                        'etag': item['etag'], 
-                       'id': item['id'], 
+                       'item_id': item['id'],
+                       'video_id': item['snippet']['resourceId']['videoId'], 
                        'title': item['snippet']['title']} 
                        for item in playlist_items_response['items']]
 
@@ -211,13 +212,14 @@ class PlaylistEditor:
 
         new_item = {'kind': response['kind'],
                     'etag': response['etag'],
-                    'id': response['id'],
+                    'item_id': response['id'],
+                    'video_id': video_id,
                     'title': response['snippet']['title']}
 
-        if pos:
-            self.items.insert(pos, new_item)
-        else:
+        if pos is None:
             self.items.append(new_item)
+        else:
+            self.items.insert(pos, new_item)
 
     def delete_video(self, pos: int, yt_service: Resource = Depends(get_yt_service)):
         """
@@ -231,7 +233,7 @@ class PlaylistEditor:
         if pos < 0:
             raise ValueError(f"pos ({pos}) must be non-negative")
 
-        playlist_item_id = self.items[pos]['id']
+        playlist_item_id = self.items[pos]['item_id']
         request = yt_service.playlistItems().delete(
             id = playlist_item_id
         )

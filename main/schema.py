@@ -130,40 +130,40 @@ class PlaylistCreate(BaseModel):
     title: str
     privacy_status: Literal["public", "private", "unlisted"] = "private"
 
-class PlaylistItemInsertRequest(BaseModel):
+class PlaylistEdit(BaseModel):
+    title: str
+    privacy_status: Literal["public", "private", "unlisted", None] = None
+
+class PlaylistItemInsert(BaseModel):
     """
     User input for inserting item into a playlist
     """
-    playlist_id: str
     video_id: str
     pos: int | None = None
 
-class PlaylistItemReplaceRequest(BaseModel):
+class PlaylistItemReplace(BaseModel):
     """
     User input for replacing a video inside a playlist
     """
-    playlist_id: str
     video_id: str
     pos: int
 
-class PlaylistItemMoveRequest(BaseModel):
+class PlaylistItemMove(BaseModel):
     """
     User input for changing a video's position within a playlist
     """
-    playlist_id: str
     init_pos: int
     target_pos: int
 
-class PlaylistEditRequest(BaseModel):
+class PlaylistItemEdit(BaseModel):
     """
     User input for editing a playlist
     """
-    mode: Literal["Insert", "Replace", "Move"]
-    details: PlaylistItemInsertRequest | PlaylistItemReplaceRequest | PlaylistItemMoveRequest 
+    mode: Literal["Replace", "Move"]
+    details: PlaylistItemReplace | PlaylistItemMove 
 
-class PlaylistItemRemoveRequest(BaseModel):
+class PlaylistItemRemove(BaseModel):
     """
     User input for removing a video from a playlist
     """
-    playlist_id: str
     pos: int
