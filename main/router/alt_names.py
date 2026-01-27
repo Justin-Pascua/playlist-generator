@@ -76,7 +76,7 @@ async def get_alt_name(id: int,
                        db: Session = Depends(get_db),
                        current_user = Depends(oauth2.get_current_user)):
     """
-    Get specified alt name
+    Get a specified alt name
     """
 
     alt_name = db.execute(select(AltName)
@@ -136,7 +136,9 @@ async def update_alt_name(id: int,
 async def delete_alt_name(id: int,
                           db: Session = Depends(get_db),
                           current_user = Depends(oauth2.get_current_user)):
-    
+    """
+    Delete a specified alt name
+    """
     alt_name = db.scalar(select(AltName).where(AltName.id == id))
     if not alt_name:
         raise HTTPException(status_code = status.HTTP_404_NOT_FOUND,

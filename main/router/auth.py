@@ -13,7 +13,9 @@ router = APIRouter(
 @router.post('/login', response_model = Token)
 def login(user_credentials: OAuth2PasswordRequestForm = Depends(), 
           db: Session = Depends(get_db)):
-    
+    """
+    Login and generate JWT token
+    """
     user = db.query(models.User).filter(
         models.User.username == user_credentials.username).first()
 

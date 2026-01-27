@@ -149,7 +149,9 @@ async def create_song(new_song: SongCreate,
 async def merge_songs(merge_details: SongMergeRequest,
                       db: Session = Depends(get_db),
                       current_user = Depends(oauth2.get_current_user)):
-    
+    """
+    Merge multiple (up to 5) song resources
+    """
     # throw exception if too many elements provided in canonical_ids field 
     # this is done to protect the system against adversial calls and clumsy users from themselves 
     if len(merge_details.canonical_ids) > 5:
@@ -228,6 +230,9 @@ async def merge_songs(merge_details: SongMergeRequest,
 async def splinter_song(splinter_details: SongSplinterRequest,
                         db: Session = Depends(get_db),
                         current_user = Depends(oauth2.get_current_user)):
+    """
+    Create a new song resource by de-coupling a specified alt name from its current song resource
+    """
     # take an alt name of a specified song, and turn it into its own song
     stmt = (select(AltName.id, 
                AltName.user_id,
@@ -282,7 +287,7 @@ async def delete_song(id: int,
                       db: Session = Depends(get_db),
                       current_user = Depends(oauth2.get_current_user)):
     """
-    Delete a song, including its alternate titles and song link
+    Delete a song resource, including its alternate titles and song link
     """
     song = db.scalar(select(Canonical).where(Canonical.id == id))
     if not song:
@@ -337,7 +342,7 @@ async def upsert_video(canonical_id: int, new_video: VideoCreate,
                        db: Session = Depends(get_db),
                        current_user = Depends(oauth2.get_current_user)):
     """
-    Create or replace video associated to canonical title
+    Create or replace the video associated to canonical title
     """
     song = db.scalar(select(Canonical).where(Canonical.id == canonical_id))
     if not song:

@@ -26,7 +26,9 @@ router = APIRouter(
 @router.get("/", response_model = List[PlaylistResponse])
 async def get_all_playlists(db: Session = Depends(get_db),
                             current_user = Depends(oauth2.get_current_user)):
-    
+    """
+    Get all playlists from database
+    """
     stmt = select(Playlist).where(Playlist.user_id == current_user.id)
     result = db.execute(stmt).scalars().all()
 
@@ -39,7 +41,9 @@ async def get_all_playlists(db: Session = Depends(get_db),
 @router.get("/{id}", response_model = PlaylistResponse)
 async def get_playlist(id: str, db: Session = Depends(get_db),
                        current_user = Depends(oauth2.get_current_user)):
-    
+    """
+    Get a specified playlist from database
+    """
     playlist = db.execute(select(Playlist)
                          .where(Playlist.id == id)).scalars().first()
 
@@ -54,21 +58,24 @@ async def get_playlist(id: str, db: Session = Depends(get_db),
     return playlist
 
 @router.post("/")
-async def create_playlist(payload: PlaylistCreate, db: Session = Depends(get_db),
+async def create_playlist(details: PlaylistCreate, db: Session = Depends(get_db),
                           yt_service: Resource = Depends(youtube.get_yt_service),
                           current_user = Depends(oauth2.get_current_user)):
+    """
+    Create a playlist
+    """
     # create blank playlist through YT API
     playlist_editor = youtube.PlaylistEditor(
         mode = 'create_new', 
-        title = payload.title,
-        privacy_status = payload.privacy_status,
+        title = details.title,
+        privacy_status = details.privacy_status,
         yt_service = yt_service
     )
 
     # record playlist details in database
     new_playlist = Playlist(
         id = playlist_editor.id,
-        playlist_title = payload.title,
+        playlist_title = details.title,
         link = playlist_editor.link,
         user_id = current_user.id,
         created_at = datetime.datetime.now()
@@ -89,7 +96,9 @@ async def edit_playlist(id: str, edit_details: PlaylistEdit,
                         db: Session = Depends(get_db),
                         yt_service: Resource = Depends(youtube.get_yt_service),
                         current_user = Depends(oauth2.get_current_user)):
-
+    """
+    Edit a playlist's title (mandatory per the YouTube Data API) and/or privacy status (optional)
+    """
     # verify that playlist exists in db and that user has access
     playlist = db.scalar(select(Playlist).where(Playlist.id == id))
     if not playlist:
@@ -129,7 +138,9 @@ async def edit_playlist(id: str, edit_details: PlaylistEdit,
 async def delete_playlist(id: str, db: Session = Depends(get_db),
                           yt_service: Resource = Depends(youtube.get_yt_service),
                           current_user = Depends(oauth2.get_current_user)):
-
+    """
+    Delete a specified playlist
+    """
     # check that playlist exists in db and that user has access to it
     playlist = db.scalar(select(Playlist).where(Playlist.id == id))
     if not playlist:
@@ -157,6 +168,9 @@ async def get_playlist_items(id: str,
                              db: Session = Depends(get_db),
                              yt_service: Resource = Depends(youtube.get_yt_service),
                              current_user = Depends(oauth2.get_current_user)):
+    """
+    Get items (i.e. videos) from specified playlist
+    """
     # check that playlist exists in db and that user has access to it
     playlist = db.scalar(select(Playlist).where(Playlist.id == id))
     if not playlist:
@@ -183,7 +197,7 @@ async def insert_video(id: str,
                        yt_service: Resource = Depends(youtube.get_yt_service),
                        current_user = Depends(oauth2.get_current_user)):
     """
-    Insert video into playlist
+    Insert video into playlist at an optional pos. If no pos specified, video is inserted at end
     """
     # check that playlist exists in db and that user has access to it
     playlist = db.scalar(select(Playlist).where(Playlist.id == id))

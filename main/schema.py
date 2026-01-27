@@ -131,10 +131,16 @@ class PlaylistCreate(BaseModel):
     privacy_status: Literal["public", "private", "unlisted"] = "private"
 
 class PlaylistEdit(BaseModel):
+    """
+    User input for modifying a playlist's title and/or privacy status
+    """
     title: str
     privacy_status: Literal["public", "private", "unlisted", None] = None
 
 class PlaylistItemResponse(BaseModel):
+    """
+    API response for sending playlist items (i.e. videos)
+    """
     kind: str
     etag: str
     item_id: str
