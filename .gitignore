@@ -3,6 +3,7 @@ __pycache__/
 
 .env
 .env_dev
+.env.dev
 client_secret*
 token.pickle
 token.json
