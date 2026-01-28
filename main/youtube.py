@@ -237,11 +237,15 @@ class PlaylistEditor:
         self.items.pop(pos)
 
     def move_video(self, init_pos: int, target_pos: int, yt_service: Resource = Depends(get_yt_service)):
-        for pos in [init_pos, target_pos]:
-            if pos >= len(self.items):
-                raise ValueError(f"pos ({pos}) must be less than length of playlist ({len(self.items)})")
-            if pos < 0:
-                raise ValueError(f"pos ({pos}) must be non-negative")
+        if init_pos >= len(self.items):
+            raise ValueError(f"init_pos ({init_pos}) must be less than length of playlist ({len(self.items)})")
+        if init_pos < 0:
+            raise ValueError(f"init_pos ({init_pos}) must be non-negative")
+        
+        if target_pos >= len(self.items):
+            raise ValueError(f"target_pos ({target_pos}) must be less than length of playlist ({len(self.items)})")
+        if target_pos < 0:
+            raise ValueError(f"target_pos ({target_pos}) must be non-negative")
 
         item_id = self.items[init_pos]['item_id']
         video_id = self.items[init_pos]['video_id']

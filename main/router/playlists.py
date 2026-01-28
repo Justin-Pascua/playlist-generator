@@ -214,9 +214,14 @@ async def insert_video(id: str,
     except Exception as e:
         raise e
 
-    playlist_editor.insert_video(video_id = details.video_id,
-                                 pos = details.pos,
-                                 yt_service = yt_service)
+    try:
+        playlist_editor.insert_video(video_id = details.video_id,
+                                    pos = details.pos,
+                                    yt_service = yt_service)
+    except ValueError as e:
+        raise HTTPException(status_code = status.HTTP_400_BAD_REQUEST,
+                            detail = str(e))
+        
     
     response = playlist_editor.items[details.pos if details.pos is not None else -1]
 
@@ -248,14 +253,22 @@ async def edit_playlist_item(id: str,
     
     response = None
     if details.mode == "Move":
-        playlist_editor.move_video(init_pos = details.sub_details.init_pos, 
-                                   target_pos = details.sub_details.target_pos, 
-                                   yt_service = yt_service)
+        try:
+            playlist_editor.move_video(init_pos = details.sub_details.init_pos, 
+                                    target_pos = details.sub_details.target_pos, 
+                                    yt_service = yt_service)
+        except ValueError as e:
+            raise HTTPException(status_code = status.HTTP_400_BAD_REQUEST,
+                                detail = str(e))
         response = playlist_editor.items[details.sub_details.target_pos]
     elif details.mode == "Replace":
-        playlist_editor.replace_video(video_id = details.sub_details.video_id,
-                                      pos = details.sub_details.pos,
-                                      yt_service = yt_service)
+        try:
+            playlist_editor.replace_video(video_id = details.sub_details.video_id,
+                                        pos = details.sub_details.pos,
+                                        yt_service = yt_service)
+        except ValueError as e:
+            raise HTTPException(status_code = status.HTTP_400_BAD_REQUEST,
+                                detail = str(e))
         response = playlist_editor.items[details.sub_details.pos]
 
     return response
@@ -284,6 +297,10 @@ async def remove_playlist_item(id: str,
     except Exception as e:
         raise e
     
-    playlist_editor.delete_video(pos = details.pos, yt_service = yt_service)
+    try:
+        playlist_editor.delete_video(pos = details.pos, yt_service = yt_service)
+    except ValueError as e:
+        raise HTTPException(status_code = status.HTTP_400_BAD_REQUEST,
+                            detail = str(e))
 
     return Response(status_code = status.HTTP_204_NO_CONTENT)
