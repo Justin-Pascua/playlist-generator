@@ -13,7 +13,7 @@ from ..schema import (SongSummary, SongCreate, SongMergeRequest, SongSplinterReq
                       AltNameCreate, AltNameResponse, AltNameUpdate, 
                       VideoCreate, VideoResponse)
 from ..models import Canonical, AltName, Video
-from .. import oauth2
+from .. import auth_utils
 
 router = APIRouter(
     prefix = "/songs",
@@ -24,7 +24,7 @@ router = APIRouter(
 @router.get("/", response_model = List[SongSummary], response_model_exclude_defaults = True)
 async def get_all_songs(get_links: bool = False, get_alts: bool = False, 
                         db: Session = Depends(get_db),
-                        current_user = Depends(oauth2.get_current_user)):
+                        current_user = Depends(auth_utils.get_current_user)):
     """
     Returns all songs in the database, and (optionally) alternate titles plus video links
     """
@@ -64,7 +64,7 @@ async def get_all_songs(get_links: bool = False, get_alts: bool = False,
 @router.get("/{id}", response_model = SongSummary)
 async def get_song(id: int, 
                    db: Session = Depends(get_db),
-                   current_user = Depends(oauth2.get_current_user)):
+                   current_user = Depends(auth_utils.get_current_user)):
     """
     Returns a specified song from the database, including its alt names and link
     """
@@ -106,7 +106,7 @@ async def get_song(id: int,
 @router.post("/", status_code = status.HTTP_201_CREATED, response_model = SongSummary, response_model_exclude_defaults = True)
 async def create_song(new_song: SongCreate, 
                       db: Session = Depends(get_db),
-                      current_user = Depends(oauth2.get_current_user)):
+                      current_user = Depends(auth_utils.get_current_user)):
     """
     Inserts a song title into the canonical_names table and alt_names table
     """
@@ -148,7 +148,7 @@ async def create_song(new_song: SongCreate,
 @router.post("/merges", status_code = status.HTTP_200_OK, response_model = SongSummary)
 async def merge_songs(merge_details: SongMergeRequest,
                       db: Session = Depends(get_db),
-                      current_user = Depends(oauth2.get_current_user)):
+                      current_user = Depends(auth_utils.get_current_user)):
     """
     Merge multiple (up to 5) song resources
     """
@@ -229,7 +229,7 @@ async def merge_songs(merge_details: SongMergeRequest,
 @router.post("/splinters", status_code = status.HTTP_201_CREATED, response_model = SongSummary)
 async def splinter_song(splinter_details: SongSplinterRequest,
                         db: Session = Depends(get_db),
-                        current_user = Depends(oauth2.get_current_user)):
+                        current_user = Depends(auth_utils.get_current_user)):
     """
     Create a new song resource by de-coupling a specified alt name from its current song resource
     """
@@ -285,7 +285,7 @@ async def splinter_song(splinter_details: SongSplinterRequest,
 @router.delete("/{id}", status_code = status.HTTP_204_NO_CONTENT)
 async def delete_song(id: int,
                       db: Session = Depends(get_db),
-                      current_user = Depends(oauth2.get_current_user)):
+                      current_user = Depends(auth_utils.get_current_user)):
     """
     Delete a song resource, including its alternate titles and song link
     """
@@ -308,7 +308,7 @@ async def delete_song(id: int,
 async def update_canonical_name(id: int,
                                 new_canonical: CanonicalUpdate,
                                 db: Session = Depends(get_db),
-                                current_user = Depends(oauth2.get_current_user)):
+                                current_user = Depends(auth_utils.get_current_user)):
     """
     Update the canonical title of a song
     """
@@ -340,7 +340,7 @@ async def update_canonical_name(id: int,
 async def upsert_video(canonical_id: int, new_video: VideoCreate,
                        response: Response,
                        db: Session = Depends(get_db),
-                       current_user = Depends(oauth2.get_current_user)):
+                       current_user = Depends(auth_utils.get_current_user)):
     """
     Create or replace the video associated to canonical title
     """
@@ -389,7 +389,7 @@ async def upsert_video(canonical_id: int, new_video: VideoCreate,
 @router.get("/{canonical_id}/videos", response_model = VideoResponse)
 async def get_video(canonical_id: int,
                    db: Session = Depends(get_db),
-                   current_user = Depends(oauth2.get_current_user)):
+                   current_user = Depends(auth_utils.get_current_user)):
     """
     Get video info for a song
     """
@@ -413,7 +413,7 @@ async def get_video(canonical_id: int,
 @router.delete("/{canonical_id}/videos")
 async def delete_video(canonical_id: int,
                       db: Session = Depends(get_db),
-                      current_user = Depends(oauth2.get_current_user)):
+                      current_user = Depends(auth_utils.get_current_user)):
     """
     Delete video item from database
     """

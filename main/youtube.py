@@ -13,15 +13,15 @@ import pickle
 from .config import settings
 from .schema import PlaylistCreate
 
-API_KEY = settings.YT_API_KEY
+API_KEY = settings.YT_API_KEY.get_secret_value()
 
 # initialize credentials for building yt_service
 credentials = Credentials(
-    token = settings.GOOGLE_TOKEN,
-    refresh_token = settings.GOOGLE_REFRESH_TOKEN,
-    token_uri = settings.GOOGLE_TOKEN_URI,
-    client_id = settings.GOOGLE_CLIENT_ID,
-    client_secret = settings.GOOGLE_CLIENT_SECRET,
+    token = settings.GOOGLE_TOKEN.get_secret_value(),
+    refresh_token = settings.GOOGLE_REFRESH_TOKEN.get_secret_value(),
+    token_uri = settings.GOOGLE_TOKEN_URI.get_secret_value(),
+    client_id = settings.GOOGLE_CLIENT_ID.get_secret_value(),
+    client_secret = settings.GOOGLE_CLIENT_SECRET.get_secret_value(),
     scopes = ["https://www.googleapis.com/auth/youtubepartner", 
               "https://www.googleapis.com/auth/youtube", 
               "https://www.googleapis.com/auth/youtube.force-ssl"]

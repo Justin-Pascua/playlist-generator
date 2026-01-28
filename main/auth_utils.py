@@ -1,17 +1,19 @@
 import jwt
 from jwt import PyJWTError
-import datetime
-from datetime import timedelta
-from . import schema, database, models
+from pwdlib import PasswordHash
 from fastapi import Depends, status, HTTPException
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
+import datetime
+from datetime import timedelta
+
+from . import schema, database, models
 from .config import settings
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl = 'login')
 
-SECRET_KEY = settings.SECRET_KEY
+SECRET_KEY = settings.SECRET_KEY.get_secret_value()
 ALGORITHM = settings.ALGORITHM
 ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MINUTES
 
@@ -60,3 +62,12 @@ def get_current_user(token: str = Depends(oauth2_scheme),
 
     return user
 
+pwd_hash = PasswordHash.recommended()
+
+def hash(password: str):
+    return pwd_hash.hash(password)
+
+def verify_password(plain_password: str, hashed_password: str):
+    return pwd_hash.verify(plain_password, hashed_password)
+
+    

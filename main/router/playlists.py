@@ -16,7 +16,7 @@ from ..schema import (PlaylistCreate, PlaylistEdit, PlaylistResponse,
                       PlaylistItemMove, PlaylistItemReplace, 
                       PlaylistItemEdit, PlaylistItemResponse)
 from ..models import Playlist
-from .. import oauth2, youtube
+from .. import auth_utils, youtube
 
 router = APIRouter(
     prefix = "/playlists",
@@ -25,7 +25,7 @@ router = APIRouter(
 
 @router.get("/", response_model = List[PlaylistResponse])
 async def get_all_playlists(db: Session = Depends(get_db),
-                            current_user = Depends(oauth2.get_current_user)):
+                            current_user = Depends(auth_utils.get_current_user)):
     """
     Get all playlists from database
     """
@@ -40,7 +40,7 @@ async def get_all_playlists(db: Session = Depends(get_db),
 
 @router.get("/{id}", response_model = PlaylistResponse)
 async def get_playlist(id: str, db: Session = Depends(get_db),
-                       current_user = Depends(oauth2.get_current_user)):
+                       current_user = Depends(auth_utils.get_current_user)):
     """
     Get a specified playlist from database
     """
@@ -60,7 +60,7 @@ async def get_playlist(id: str, db: Session = Depends(get_db),
 @router.post("/")
 async def create_playlist(details: PlaylistCreate, db: Session = Depends(get_db),
                           yt_service: Resource = Depends(youtube.get_yt_service),
-                          current_user = Depends(oauth2.get_current_user)):
+                          current_user = Depends(auth_utils.get_current_user)):
     """
     Create a playlist
     """
@@ -95,7 +95,7 @@ async def create_playlist(details: PlaylistCreate, db: Session = Depends(get_db)
 async def edit_playlist(id: str, edit_details: PlaylistEdit,
                         db: Session = Depends(get_db),
                         yt_service: Resource = Depends(youtube.get_yt_service),
-                        current_user = Depends(oauth2.get_current_user)):
+                        current_user = Depends(auth_utils.get_current_user)):
     """
     Edit a playlist's title (mandatory per the YouTube Data API) and/or privacy status (optional)
     """
@@ -137,7 +137,7 @@ async def edit_playlist(id: str, edit_details: PlaylistEdit,
 @router.delete("/{id}")
 async def delete_playlist(id: str, db: Session = Depends(get_db),
                           yt_service: Resource = Depends(youtube.get_yt_service),
-                          current_user = Depends(oauth2.get_current_user)):
+                          current_user = Depends(auth_utils.get_current_user)):
     """
     Delete a specified playlist
     """
@@ -167,7 +167,7 @@ async def delete_playlist(id: str, db: Session = Depends(get_db),
 async def get_playlist_items(id: str,
                              db: Session = Depends(get_db),
                              yt_service: Resource = Depends(youtube.get_yt_service),
-                             current_user = Depends(oauth2.get_current_user)):
+                             current_user = Depends(auth_utils.get_current_user)):
     """
     Get items (i.e. videos) from specified playlist
     """
@@ -195,7 +195,7 @@ async def insert_video(id: str,
                        details: PlaylistItemInsert, 
                        db: Session = Depends(get_db),
                        yt_service: Resource = Depends(youtube.get_yt_service),
-                       current_user = Depends(oauth2.get_current_user)):
+                       current_user = Depends(auth_utils.get_current_user)):
     """
     Insert video into playlist at an optional pos. If no pos specified, video is inserted at end
     """
@@ -227,7 +227,7 @@ async def edit_playlist_item(id: str,
                              details: PlaylistItemEdit, 
                              db: Session = Depends(get_db),
                              yt_service: Resource = Depends(youtube.get_yt_service),
-                             current_user = Depends(oauth2.get_current_user)):
+                             current_user = Depends(auth_utils.get_current_user)):
     """
     Replace or move video within a playlist
     """
@@ -265,7 +265,7 @@ async def remove_playlist_item(id: str,
                                details: PlaylistItemRemove, 
                                db: Session = Depends(get_db),
                                yt_service: Resource = Depends(youtube.get_yt_service),
-                               current_user = Depends(oauth2.get_current_user)):
+                               current_user = Depends(auth_utils.get_current_user)):
     """
     Remove a video within a specified playlist
     """

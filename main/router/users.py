@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
 from typing import List
-from .. import models, schema, utils
+from .. import models, schema, auth_utils
 
 from ..schema import UserCreate, UserResponse 
 from ..database import get_db
@@ -19,7 +19,7 @@ def create_user(user_input: UserCreate, db: Session = Depends(get_db)):
     Create a user
     """
     # hash the password
-    hashed_password = utils.hash(user_input.password)
+    hashed_password = auth_utils.hash(user_input.password)
     user_input.password = hashed_password
     
     new_user = models.User(**user_input.model_dump())

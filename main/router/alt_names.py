@@ -9,7 +9,7 @@ from typing import List, Optional
 from ..database import get_db
 from ..schema import AltNameCreate, AltNameResponse, AltNameUpdate
 from ..models import Canonical, AltName
-from .. import oauth2
+from .. import auth_utils
 
 router = APIRouter(
     prefix = "/alt-names",
@@ -20,7 +20,7 @@ router = APIRouter(
 @router.post("/", response_model = AltNameResponse, status_code = status.HTTP_201_CREATED)
 async def create_alt_name(new_alt: AltNameCreate, 
                           db: Session = Depends(get_db),
-                          current_user = Depends(oauth2.get_current_user)):
+                          current_user = Depends(auth_utils.get_current_user)):
     """
     Create an alt name 
     """
@@ -54,7 +54,7 @@ async def create_alt_name(new_alt: AltNameCreate,
 @router.get("/", response_model = List[AltNameResponse])
 async def get_all_alt_names(canonical_id: int = None, 
                             db: Session = Depends(get_db),
-                            current_user = Depends(oauth2.get_current_user)):
+                            current_user = Depends(auth_utils.get_current_user)):
     """
     Get all alt names 
     """
@@ -74,7 +74,7 @@ async def get_all_alt_names(canonical_id: int = None,
 @router.get("/{id}", response_model = AltNameResponse)
 async def get_alt_name(id: int,
                        db: Session = Depends(get_db),
-                       current_user = Depends(oauth2.get_current_user)):
+                       current_user = Depends(auth_utils.get_current_user)):
     """
     Get a specified alt name
     """
@@ -96,7 +96,7 @@ async def get_alt_name(id: int,
 async def update_alt_name(id: int, 
                           new_alt: AltNameUpdate,
                           db: Session = Depends(get_db),
-                          current_user = Depends(oauth2.get_current_user)):
+                          current_user = Depends(auth_utils.get_current_user)):
     """
     Update an alt name's title and/or which canonical title it points to
     """
@@ -135,7 +135,7 @@ async def update_alt_name(id: int,
 @router.delete("/{id}")
 async def delete_alt_name(id: int,
                           db: Session = Depends(get_db),
-                          current_user = Depends(oauth2.get_current_user)):
+                          current_user = Depends(auth_utils.get_current_user)):
     """
     Delete a specified alt name
     """

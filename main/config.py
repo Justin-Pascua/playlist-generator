@@ -1,24 +1,25 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import SecretStr
 
 class Settings(BaseSettings):
-    HF_TOKEN: str
+    HF_TOKEN: SecretStr
 
-    YT_API_KEY: str
+    YT_API_KEY: SecretStr
     
-    MYSQL_PROTOCOL: str
-    MYSQL_HOST: str
-    MYSQL_USER: str
+    MYSQL_PROTOCOL: SecretStr
+    MYSQL_HOST: SecretStr
+    MYSQL_USER: SecretStr
     MYSQL_PORT: int
-    MYSQL_PASSWORD: str
-    MYSQL_DB_NAME: str
+    MYSQL_PASSWORD: SecretStr
+    MYSQL_DB_NAME: SecretStr
 
-    GOOGLE_TOKEN: str
-    GOOGLE_REFRESH_TOKEN: str
-    GOOGLE_TOKEN_URI: str
-    GOOGLE_CLIENT_ID: str
-    GOOGLE_CLIENT_SECRET: str
+    GOOGLE_TOKEN: SecretStr
+    GOOGLE_REFRESH_TOKEN: SecretStr
+    GOOGLE_TOKEN_URI: SecretStr
+    GOOGLE_CLIENT_ID: SecretStr
+    GOOGLE_CLIENT_SECRET: SecretStr
 
-    SECRET_KEY: str
+    SECRET_KEY: SecretStr
     ALGORITHM: str
     ACCESS_TOKEN_EXPIRE_MINUTES: int
 
