@@ -64,7 +64,7 @@ class Video(Base):
 
     # multiple users can know the same song, but each user can only assign one link to a given song
     __table_args__ = (
-        UniqueConstraint("id", "user_id"),
+        UniqueConstraint("canonical_name_id", "user_id"),
     )
 
 class User(Base):

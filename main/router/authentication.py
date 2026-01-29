@@ -7,10 +7,11 @@ from ..schema import UserLogin, Token
 from .. import auth_utils, models
 
 router = APIRouter(
+    prefix = '/authentication',
     tags = ['Authentication']
 )
 
-@router.post('/login', response_model = Token)
+@router.post('/', response_model = Token)
 def login(user_credentials: OAuth2PasswordRequestForm = Depends(), 
           db: Session = Depends(get_db)):
     """

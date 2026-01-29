@@ -15,8 +15,14 @@ config = context.config
 
 # url encoding
 # Alembic needs an extra % sign in order to escape % signs. Note that this is not needed for the SQLAlchemy engine
-DB_PASSWORD_ENCODED = quote_plus(settings.MYSQL_PASSWORD).replace('%', '%%')   
-DB_URL = f"{settings.MYSQL_PROTOCOL}://{settings.MYSQL_USER}:{DB_PASSWORD_ENCODED}@{settings.MYSQL_HOST}:{settings.MYSQL_PORT}/{settings.DB_NAME}"
+DB_PROTOCOL = settings.MYSQL_PROTOCOL.get_secret_value()
+DB_USER = settings.MYSQL_USER.get_secret_value()
+DB_PASSWORD_ENCODED = quote_plus(settings.MYSQL_PASSWORD.get_secret_value())   # url encoding
+DB_HOST = settings.MYSQL_HOST.get_secret_value()
+DB_PORT = settings.MYSQL_PORT
+DB_NAME = settings.MYSQL_DB_NAME.get_secret_value()
+
+DB_URL = f"{DB_PROTOCOL}://{DB_USER}:{DB_PASSWORD_ENCODED}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
 config.set_main_option('sqlalchemy.url', DB_URL)
 

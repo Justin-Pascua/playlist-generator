@@ -255,8 +255,8 @@ async def edit_playlist_item(id: str,
     if details.mode == "Move":
         try:
             playlist_editor.move_video(init_pos = details.sub_details.init_pos, 
-                                    target_pos = details.sub_details.target_pos, 
-                                    yt_service = yt_service)
+                                       target_pos = details.sub_details.target_pos, 
+                                       yt_service = yt_service)
         except ValueError as e:
             raise HTTPException(status_code = status.HTTP_400_BAD_REQUEST,
                                 detail = str(e))
@@ -264,8 +264,8 @@ async def edit_playlist_item(id: str,
     elif details.mode == "Replace":
         try:
             playlist_editor.replace_video(video_id = details.sub_details.video_id,
-                                        pos = details.sub_details.pos,
-                                        yt_service = yt_service)
+                                          pos = details.sub_details.pos,
+                                          yt_service = yt_service)
         except ValueError as e:
             raise HTTPException(status_code = status.HTTP_400_BAD_REQUEST,
                                 detail = str(e))

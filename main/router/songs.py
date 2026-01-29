@@ -21,7 +21,7 @@ router = APIRouter(
 )
 
 # SONG SUMMARIES
-@router.get("/", response_model = List[SongSummary], response_model_exclude_defaults = True)
+@router.get("/", response_model = List[SongSummary])
 async def get_all_songs(get_links: bool = False, get_alts: bool = False, 
                         db: Session = Depends(get_db),
                         current_user = Depends(auth_utils.get_current_user)):

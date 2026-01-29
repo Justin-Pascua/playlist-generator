@@ -79,7 +79,7 @@ class PlaylistEditor:
     def __init__(self, mode = Literal['create_new', 'from_existing'], **kwargs):
         """
         Initializes object in one of two ways by calling one of two helper methods.
-        params:
+        Args:
             mode: a string specifying how to initialize the object. 
             If 'create_new', then a new playlist is created through the YouTube Data API. In this case, kwargs should
             contain `title` and `privacy_status` arguments.
@@ -106,7 +106,7 @@ class PlaylistEditor:
         """
         Helper function for __init__ which initializes instance by creating a new YouTube playlist
         using the YouTube Data API.
-        params:
+        Args:
             title: a string used to set the title of the playlist
             privacy_status: a string among `["public", "private", "unlisted"]` used to set the status of the playlist
         """
@@ -135,7 +135,7 @@ class PlaylistEditor:
         """
         Helper function for __init__ which initializes instance by fetching data from the 
         YouTube Data API concerning an existing YouTube playlist
-        params:
+        Args:
             playlist_id: a string representing the playlist_id of an existing YouTube playlist
         """
         
@@ -178,7 +178,7 @@ class PlaylistEditor:
     def insert_video(self, video_id: str, pos: int = None, yt_service: Resource = Depends(get_yt_service)):
         """
         Inserts a video into the playlist. 
-        params:
+        Args:
             video_id: a string representing the id of an existing YouTube video
             pos: a zero-indexed int or `None` indicating what position to insert the video. 
             If `None`, then video is inserted at the end of the playlist.
@@ -219,7 +219,7 @@ class PlaylistEditor:
     def delete_video(self, pos: int, yt_service: Resource = Depends(get_yt_service)):
         """
         Deletes a video from the playlist.
-        params:
+        Args:
             pos: a zero-indexed, int which is non-negative and <= the current length of the playlist. 
             This specifies the position of the video to be deleted.
         """
@@ -275,7 +275,7 @@ class PlaylistEditor:
         Replaces a video in the playlist with a new video. The YouTube Data API does not provide a 
         way of doing this with an update method, so this is done by first deleting the video from the playlist,
         and inserting the new video at the target position.
-        params:
+        Args:
             video_id: a string representing the video id of the new YouTube video.
             pos: a zero-indexed integer representing the position of the video to be replaced.
         """
