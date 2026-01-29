@@ -29,8 +29,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(['canonical_name_id'], ['canonical_names.id'], ondelete='CASCADE'),
         sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
         sa.PrimaryKeyConstraint('id'),
-        sa.UniqueConstraint('canonical_name_id'),
-        sa.UniqueConstraint('id', 'user_id')
+        sa.UniqueConstraint('canonical_name_id', 'user_id')
     )
 
     op.drop_index(op.f('song_id'), table_name='song_links')
