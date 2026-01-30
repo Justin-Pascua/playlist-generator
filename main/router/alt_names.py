@@ -114,7 +114,7 @@ async def update_alt_name(id: int,
         canonical = db.scalar(select(Canonical).where(Canonical.id == new_alt.canonical_id))
         
         if not canonical:
-            raise HTTPException(status_code = status.HTTP_403_FORBIDDEN,
+            raise HTTPException(status_code = status.HTTP_404_NOT_FOUND,
                                 detail = "Provided canonical id does not exist")
         if canonical.user_id != current_user.id:
             raise HTTPException(status_code = status.HTTP_403_FORBIDDEN,

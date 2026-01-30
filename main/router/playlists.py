@@ -57,7 +57,7 @@ async def get_playlist(id: str, db: Session = Depends(get_db),
 
     return playlist
 
-@router.post("/")
+@router.post("/", response_model = PlaylistResponse)
 async def create_playlist(details: PlaylistCreate, db: Session = Depends(get_db),
                           yt_service: Resource = Depends(youtube.get_yt_service),
                           current_user = Depends(auth_utils.get_current_user)):
@@ -91,7 +91,7 @@ async def create_playlist(details: PlaylistCreate, db: Session = Depends(get_db)
     db.refresh(new_playlist)
     return new_playlist
 
-@router.patch("/{id}")
+@router.patch("/{id}", response_model = PlaylistResponse)
 async def edit_playlist(id: str, edit_details: PlaylistEdit,
                         db: Session = Depends(get_db),
                         yt_service: Resource = Depends(youtube.get_yt_service),

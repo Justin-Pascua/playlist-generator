@@ -22,19 +22,19 @@ router = APIRouter(
 
 # SONG SUMMARIES
 @router.get("/", response_model = List[SongSummary])
-async def get_all_songs(get_links: bool = False, get_alts: bool = False, 
-                        db: Session = Depends(get_db),
+async def get_all_songs(db: Session = Depends(get_db),
                         current_user = Depends(auth_utils.get_current_user)):
     """
     Returns all songs in the database, and (optionally) alternate titles plus video links
     """
 
     # choose fields to fetch
-    select_cols = [Canonical.title.label("title"), Canonical.id.label("id")]
-    if get_links:
-        select_cols.append(Video.link.label("link"))
-    if get_alts:
-        select_cols.append(func.coalesce(
+    stmt = (select(
+        Canonical.title.label('title'),
+        Canonical.id.label('id'),
+        Canonical.user_id.label('user_id'),
+        Video.link.label("link"),
+        func.coalesce(
                 func.JSON_ARRAYAGG(
                     func.JSON_OBJECT(
                         "id", AltName.id,
@@ -42,16 +42,11 @@ async def get_all_songs(get_links: bool = False, get_alts: bool = False,
                     )
                 ),
                 func.cast("[]", JSON),
-            ).label("alt_names"),)
-
-    # build query statement
-    stmt = select(*select_cols).where(Canonical.user_id == current_user.id)
-    if get_links:
-        stmt = stmt.join(Video, Canonical.id == Video.canonical_name_id, isouter = True)
-    if get_alts:
-        stmt = (stmt
-                .join(AltName, Canonical.id == AltName.canonical_id, isouter = True)
-                .group_by(Canonical.id))
+            ).label("alt_names"),
+        )
+        .join(Video, Canonical.id == Video.canonical_name_id, isouter = True)
+        .join(AltName, Canonical.id == AltName.canonical_id, isouter = True)
+        .group_by(Canonical.id, Canonical.title, Video.link))
 
     result = db.execute(stmt).all() 
     
