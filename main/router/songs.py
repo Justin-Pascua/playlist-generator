@@ -22,7 +22,8 @@ router = APIRouter(
 
 # SONG SUMMARIES
 @router.get("/", response_model = List[SongSummary])
-async def get_all_songs(db: Session = Depends(get_db),
+async def get_all_songs(query_str: str = None,
+                        db: Session = Depends(get_db),
                         current_user = Depends(auth_utils.get_current_user)):
     """
     Returns all songs in the database, and (optionally) alternate titles plus video links
@@ -47,6 +48,9 @@ async def get_all_songs(db: Session = Depends(get_db),
         .join(Video, Canonical.id == Video.canonical_name_id, isouter = True)
         .join(AltName, Canonical.id == AltName.canonical_id, isouter = True)
         .group_by(Canonical.id, Canonical.title, Video.link))
+    
+    if query_str is not None:
+        stmt = stmt.having(func.sum(AltName.title == query_str) > 0)
 
     result = db.execute(stmt).all() 
     

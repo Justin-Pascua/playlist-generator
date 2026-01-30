@@ -24,12 +24,16 @@ router = APIRouter(
 )
 
 @router.get("/", response_model = List[PlaylistResponse])
-async def get_all_playlists(db: Session = Depends(get_db),
+async def get_all_playlists(query_str: str = None,
+                            db: Session = Depends(get_db),
                             current_user = Depends(auth_utils.get_current_user)):
     """
     Get all playlists from database
     """
     stmt = select(Playlist).where(Playlist.user_id == current_user.id)
+    if query_str is not None:
+        stmt = stmt.where(Playlist.playlist_title == query_str)
+
     result = db.execute(stmt).scalars().all()
 
     if not result:

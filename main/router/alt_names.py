@@ -52,14 +52,17 @@ async def create_alt_name(new_alt: AltNameCreate,
     return created_alt
 
 @router.get("/", response_model = List[AltNameResponse])
-async def get_all_alt_names(canonical_id: int = None, 
+async def get_all_alt_names(query_str: str = None,
+                            canonical_id: int = None, 
                             db: Session = Depends(get_db),
                             current_user = Depends(auth_utils.get_current_user)):
     """
     Get all alt names 
     """
     stmt = select(AltName).where(AltName.user_id == current_user.id)
-    if canonical_id:
+    if query_str is not None:
+        stmt = stmt.where(AltName.title == query_str)
+    if canonical_id is not None:
         stmt = stmt.where(AltName.canonical_id == canonical_id)
     
     # .all() needed for if-statement
