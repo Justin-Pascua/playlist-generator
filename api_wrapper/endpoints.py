@@ -2,7 +2,8 @@ import httpx
 import warnings
 from typing import List, Optional
 
-from .exceptions import AuthenticationError, AuthorizationError, NotFoundError, ConflictError, PartialOperationWarning
+from .exceptions import (AuthenticationError, AuthorizationError, NotFoundError, 
+                         ConflictError, VideoLinkParserError, PartialOperationWarning)
 
 BASE_URL = "http://localhost:8000"
 
@@ -134,6 +135,9 @@ class AltNames(Endpoint):
         elif response.status_code == 403:
             # user does not have access to alt name
             raise AuthorizationError(response.json()['detail'])
+        elif response.status_code == 409:
+            # cannot remove canonical title from alt names
+            raise ConflictError(response.json()['detail'])
         return response
 
 class Songs(Endpoint):
@@ -169,7 +173,7 @@ class Songs(Endpoint):
         elif response.status_code == 403:
             # user does not have access to resource specified by id
             raise AuthorizationError(f"{response.json()['detail']}")
-
+        
         return response
         
     def patch(self, id: int, title: str):
@@ -228,8 +232,10 @@ class Songs(Endpoint):
                 pass
         self._check_common_exceptions(response)
         if response.status_code == 404:
+            # invalid ids
             raise NotFoundError(response.json()['detail'])
         elif response.status_code == 403:
+            # user does not have access to song specified by id
             raise AuthorizationError(response.json()['detail'])
         return response
 

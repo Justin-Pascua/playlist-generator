@@ -115,7 +115,7 @@ async def create_song(new_song: SongCreate,
             .where(Canonical.title == new_song.title)
             .where(Canonical.user_id == current_user.id))
     result = db.execute(stmt).scalar()
-    if result:
+    if result is not None:
         raise HTTPException(status_code = status.HTTP_409_CONFLICT,
                             detail = "Provided name already exists in canonical_names")
     
@@ -123,7 +123,7 @@ async def create_song(new_song: SongCreate,
             .where(AltName.title == new_song.title)
             .where(AltName.user_id == current_user.id))
     result = db.execute(stmt).scalar()
-    if result:
+    if result is not None:
         raise HTTPException(status_code = status.HTTP_409_CONFLICT,
                             detail = "Provided name already exists in alt_names")
 

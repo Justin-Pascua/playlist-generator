@@ -11,5 +11,8 @@ class NotFoundError(Exception):
 class ConflictError(Exception):
     """Corresponds to 409 response (i.e. resource already exists)"""
 
+class VideoLinkParserError(Exception):
+    """Raised when `utils.extract_video_id` cannot identify video id from a link"""
 class PartialOperationWarning(UserWarning):
     """Raised when a requested side effect is not performed"""
+

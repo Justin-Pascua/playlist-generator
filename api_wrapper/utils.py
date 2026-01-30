@@ -1,5 +1,6 @@
 from googleapiclient.discovery import build
 from urllib.parse import urlparse, parse_qs, unquote
+from .exceptions import VideoLinkParserError
 
 def search_video(query_string: str, api_key: str):
     """
@@ -95,7 +96,8 @@ def extract_video_id(url: str):
                 return extract_video_id(f"https://www.youtube.com{u}")
             return extract_video_id(u)
 
-    return None
+    # if all else fails, raise exception
+    raise VideoLinkParserError(f"Could not find video id within the link {url}")
 
 def get_video_details(video_id: str, api_key: str):
     """

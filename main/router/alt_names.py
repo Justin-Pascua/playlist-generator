@@ -142,13 +142,25 @@ async def delete_alt_name(id: int,
     """
     Delete a specified alt name
     """
-    alt_name = db.scalar(select(AltName).where(AltName.id == id))
+    # stmt = (select(AltName.title.label('alt_title'),
+    #                AltName.user_id,
+    #                Canonical.title.label('canonical_title'))
+    #         .join(Canonical, AltName.canonical_id == Canonical.id)
+    #         .where(AltName.id == id))
+    # result = db.execute(stmt).first()
+    stmt = (select(AltName)
+            .join(Canonical, AltName.canonical_id == Canonical.id)
+            .where(AltName.id == id))
+    alt_name = db.execute(stmt).scalar_one_or_none()
     if not alt_name:
         raise HTTPException(status_code = status.HTTP_404_NOT_FOUND,
                             detail = f"Alt name not found")
     if alt_name.user_id != current_user.id:
         raise HTTPException(status_code = status.HTTP_403_FORBIDDEN,
                             detail = f"You do not have access to this alt name")
+    if alt_name.title == alt_name.canonical_title.title:
+        raise HTTPException(status_code = status.HTTP_409_CONFLICT,
+                            detail = f"The canonical title of a song cannot be removed from its alternate titles")
     
     db.delete(alt_name)
     db.commit()
