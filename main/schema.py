@@ -2,6 +2,8 @@ from typing import List, Optional, Literal, Tuple
 from pydantic import BaseModel, EmailStr
 from datetime import datetime
 
+class DefaultResponse(BaseModel):
+    detail: str
 
 class UserCreate(BaseModel):
     username: str

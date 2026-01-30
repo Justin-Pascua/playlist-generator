@@ -11,7 +11,8 @@ from ..database import get_db
 from ..schema import (SongSummary, SongCreate, SongMergeRequest, SongSplinterRequest,
                       CanonicalCreate, CanonicalUpdate, 
                       AltNameCreate, AltNameResponse, AltNameUpdate, 
-                      VideoCreate, VideoResponse)
+                      VideoCreate, VideoResponse,
+                      DefaultResponse)
 from ..models import Canonical, AltName, Video
 from .. import auth_utils
 
@@ -144,7 +145,7 @@ async def create_song(new_song: SongCreate,
 
     return response
 
-@router.post("/merges", status_code = status.HTTP_200_OK, response_model = SongSummary)
+@router.post("/merges", status_code = status.HTTP_200_OK, response_model = SongSummary | DefaultResponse)
 async def merge_songs(merge_details: SongMergeRequest,
                       db: Session = Depends(get_db),
                       current_user = Depends(auth_utils.get_current_user)):
@@ -182,6 +183,10 @@ async def merge_songs(merge_details: SongMergeRequest,
     if merge_details.priority_id in merge_details.canonical_ids:
         # not using .remove() in case there are multiple instances that need to be removed
         merge_details.canonical_ids = [id for id in merge_details.canonical_ids if id != merge_details.priority_id]
+    
+    # if list is now empty, then user just tried to merge a song with just itself. Exit and return 200
+    if len(merge_details.canonical_ids) == 0:
+        return {"detail": "No changes were made as the provided id's point to the same resource"}
 
     # reassign alt names to all point to canonical_title of main song
     stmt = (update(AltName)
