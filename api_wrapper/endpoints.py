@@ -1,6 +1,6 @@
 import httpx
 import warnings
-from typing import List, Optional
+from typing import List, Optional, Literal
 
 from .exceptions import (AuthenticationError, AuthorizationError, NotFoundError, 
                          ConflictError, VideoLinkParserError, PartialOperationWarning)
@@ -343,7 +343,17 @@ class Playlists(Endpoint):
             raise AuthorizationError(response.json()['detail'])
         return response
 
-    def patch_item(self, id: str, mode: str, sub_details: dict):
+    def patch_item(self, id: str, mode: Literal["Replace", "Move"], sub_details: dict):
+        """
+        Calls patch method at /playlist/{id}/ route. This is used to replace a video within a playlist
+        or adjust its position.
+        Args:
+            id: id of playlist 
+            mode: a string, either "Replace" or "Move", indicating what type of patch to perform.
+            sub_details: a dict containing the details used to perform either the replace or move operation.
+                - If `mode` is "Replace", then `sub_details` is of the form {'video_id': str, 'pos': int}.
+                - If `mode` is "Move", then `sub_details` is of the form {'init_pos': int, 'target_pos': int} 
+        """
         response = self.client.patch(self.url + f'/{id}' + '/items',
                                      json = {'mode': mode,
                                              'sub_details': sub_details})

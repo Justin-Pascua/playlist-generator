@@ -218,17 +218,160 @@ class APIWrapper():
         
     
     # PLAYLIST OPERATIONS
-    def add_to_playlist(self, video_link, playlist_id):
-        pass
+    def edit_playlist_title(self, old_title: str, new_title: str):
+        try:
+            playlist = self._db_search_playlist(old_title)
+        except NotFoundError:
+            print(f"Aborted operation. Could not find playlist with title '{old_title}'!")
+            return
 
-    def replace_vid_in_playlist(self, video_link, playlist_id):
-        pass
+        try:
+            self.playlists.patch(id = playlist['id'],
+                                 title = new_title)
+            print(f"Successfully changed playlist title!")
+        except:
+            print(f"Abandoned operation. Unexpected error while calling YouTube Data API")
+            
+    def add_to_playlist(self, playlist_title: str, video_link: str, record_in_db: bool = False):
+        self._check_yt_api_key()
+        # fetch playlist id by searching db by name
+        try:
+            playlist = self._db_search_playlist(playlist_title)
+        except NotFoundError:
+            print(f"Aborted operation. Could not find playlist titled '{playlist_title}'!")
+            return
+        
+        # get yt video by calling yt data api
+        try:
+            video_id = utils.extract_video_id(video_link)
+            video = utils.get_video_details(video_id, self.YT_API_KEY)
+        except VideoLinkParserError as e:
+            print(f"Aborted operation. {e}")
+            return
+        except:
+            print(f"Aborted operation. Unexpected error while calling YouTube Data API")
+            return
+        
+        # insert into playlist
+        try:
+            self.playlists.post_item(id = playlist['id'],
+                                     video_id = video['id'])
+        except:
+            print("Unexpected error occured while calling YouTube Data API")
+            return
+        
+        if not record_in_db:
+            print("Successfully added video!")
+            return
 
-    def move_vid_in_playlist(self, init_pos, target_pos, playlist_id):
-        pass
+        # try creating new song for provided video
+        try:
+            new_song_response = self.songs.post(video['video_title'])
+            self.songs.put_video(id = new_song_response.json()['id'],
+                                 video_id = video['id'],
+                                 video_title = video['video_title'],
+                                 channel_name = video['channel_name'])
+        except ConflictError:
+            # if song already exists, use put method to modify associated song
+            existing_song = self._db_search_song(video['video_title'])
+            self.songs.put_video(id = existing_song['id'],
+                                 video_id = video['id'],
+                                 video_title = video['video_title'],
+                                 channel_name = video['channel_name'])
+        print("Successfully added video!")
 
-    def remove_from_playlist(self, pos, playlist_id):
-        pass
+    def replace_vid_in_playlist(self, playlist_title: str, pos: int, video_link: str, record_in_db: bool = False):
+        self._check_yt_api_key()
+        # fetch playlist id by searching db by name
+        try:
+            playlist = self._db_search_playlist(playlist_title)
+        except NotFoundError:
+            print(f"Aborted operation. Could not find playlist titled '{playlist_title}'!")
+            return
+        # get yt video by calling yt data api
+        try:
+            video_id = utils.extract_video_id(video_link)
+            video = utils.get_video_details(video_id, self.YT_API_KEY)
+        except VideoLinkParserError as e:
+            print(f"Aborted operation. {e}")
+            return
+        except:
+            print(f"Aborted operation. Unexpected error while calling YouTube Data API")
+            return
+        # insert video into playlist
+        try:
+            self.playlists.patch_item(id = playlist['id'],
+                                      mode = 'Replace',
+                                      sub_details = {'video_id': video['id'],
+                                                     'pos': pos})
+        except ValueError as e:
+            # raised when init_pos and target_pos are out of bounds 
+            print(f"Aborted operation. {e}")
+            return
+        except:
+            print("Unexpected error occured while calling YouTube Data API")
+            return
+        
+        if not record_in_db:
+            print("Successfully replaced video!")
+            return
+
+        # try creating new song for provided video
+        try:
+            new_song_response = self.songs.post(video['video_title'])
+            self.songs.put_video(id = new_song_response.json()['id'],
+                                 video_id = video['id'],
+                                 video_title = video['video_title'],
+                                 channel_name = video['channel_name'])
+        except ConflictError:
+            # if song already exists, use put method to modify associated song
+            existing_song = self._db_search_song(video['video_title'])
+            self.songs.put_video(id = existing_song['id'],
+                                 video_id = video['id'],
+                                 video_title = video['video_title'],
+                                 channel_name = video['channel_name'])
+        print("Successfully replaced video!")
+        
+    def move_vid_in_playlist(self, playlist_title: str, init_pos: int, target_pos: int):
+        try:
+            playlist = self._db_search_playlist(playlist_title)
+        except NotFoundError:
+            print(f"Aborted operation. Could not find playlist titled '{playlist_title}'!")
+            return
+        
+        try:
+            self.playlists.patch_item(id = playlist['id'],
+                                      mode = 'Move',
+                                      sub_details = {'init_pos': init_pos,
+                                                     'target_pos': target_pos})
+        except ValueError as e:
+            # raised when init_pos and target_pos are out of bounds 
+            print(f"Aborted operation. {e}")
+            return
+        except:
+            print("Unexpected error occured while calling YouTube Data API")
+            return
+        
+        print("Successfully edited playlist!")
+
+    def remove_from_playlist(self, playlist_title: str, pos: int):
+        try:
+            playlist = self._db_search_playlist(playlist_title)
+        except NotFoundError:
+            print(f"Aborted operation. Could not find playlist titled '{playlist_title}'!")
+            return
+        
+        try:
+            self.playlists.delete_item(playlist['id'], pos)
+        except ValueError as e:
+            # raised when pos is out of bounds 
+            print(f"Playlist not edited. {e}")
+            return
+        except:
+            print("Unexpected error occured while calling YouTube Data API")
+            return
+        
+        print("Successfuly removed video from playlist!")
 
     # SONG MANAGEMENT
     def merge_songs(self, priority_song: str, other_song: str):
@@ -267,6 +410,8 @@ class APIWrapper():
             self.songs.delete(song['id'])
         except NotFoundError:
             print(f"Song '{title}' not found!")
+            return
+        print("Successfully deleted song!")
 
     def add_alt_names(self, target_title: str, alt_names: List[str]):
         song = None
@@ -274,12 +419,15 @@ class APIWrapper():
             song = self._db_search_song(target_title)
         except NotFoundError:
             print(f"Found no song with the title '{target_title}!'")
+            return
         
         for alt_name in alt_names:
             try:
                 self.alt_names.post(alt_name, song['id'])
             except ConflictError:
                 print(f"The title '{alt_name}' is already assigned to a song!")
+        
+        print("Successfully added alt titles!")
 
     def delete_alt_names(self, alt_names: List[str]):
         for alt_name in alt_names:
@@ -288,8 +436,12 @@ class APIWrapper():
                 self.alt_names.delete(target['id'])
             except NotFoundError:
                 print(f"Alt title '{alt_name}' not found!")
+                return
             except ConflictError:
                 print(f"Cannot delete the title '{alt_name}' because it is the canonical title of the overlying song!")
+                return
+            
+        print("Successfully deleted alternate titles!")
 
     def modify_title(self, old_title: str, new_title: str):
         try:
@@ -320,6 +472,8 @@ class APIWrapper():
             print("Successfully assigned video!")
         except NotFoundError:
             print(f"Assignment failed. Could not find song with title '{song_title}'")
+            return
         except VideoLinkParserError:
             print(f"Assignment failed. Could not identify video id from the provided link. Please try a different link format")
+            return
         

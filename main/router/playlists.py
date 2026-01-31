@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Response, status, HTTPException, Depends, APIRouter
 
-from sqlalchemy import select
+from sqlalchemy import select, desc
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
@@ -28,11 +28,12 @@ async def get_all_playlists(query_str: str = None,
                             db: Session = Depends(get_db),
                             current_user = Depends(auth_utils.get_current_user)):
     """
-    Get all playlists from database
+    Get all playlists from database.
     """
     stmt = select(Playlist).where(Playlist.user_id == current_user.id)
     if query_str is not None:
         stmt = stmt.where(Playlist.playlist_title == query_str)
+    stmt = stmt.order_by(desc(Playlist.created_at))
 
     result = db.execute(stmt).scalars().all()
 
@@ -136,7 +137,7 @@ async def edit_playlist(id: str, edit_details: PlaylistEdit,
     db.commit()
     db.refresh(playlist)
     
-    return {playlist}
+    return playlist
 
 @router.delete("/{id}")
 async def delete_playlist(id: str, db: Session = Depends(get_db),
