@@ -43,6 +43,27 @@ async def get_all_playlists(query_str: str = None,
     
     return result
 
+@router.get("/latest", response_model = PlaylistResponse)
+async def get_recent_playlist(db: Session = Depends(get_db),
+                              current_user = Depends(auth_utils.get_current_user)):
+    """
+    Get most recent playlist accessible to the user
+    """
+    stmt = (select(Playlist)
+            .where(Playlist.user_id == current_user.id)
+            .order_by(desc(Playlist.created_at)))
+    playlist = db.execute(stmt).scalars().first()
+    print(playlist)
+    if not playlist:
+        raise HTTPException(status_code = status.HTTP_404_NOT_FOUND,
+                            detail = f"Playlist not found")
+
+    if playlist.user_id != current_user.id:
+        raise HTTPException(status_code = status.HTTP_403_FORBIDDEN,
+                            detail = f"You do have access to this playlist")
+
+    return playlist
+
 @router.get("/{id}", response_model = PlaylistResponse)
 async def get_playlist(id: str, db: Session = Depends(get_db),
                        current_user = Depends(auth_utils.get_current_user)):

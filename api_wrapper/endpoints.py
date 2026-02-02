@@ -301,6 +301,15 @@ class Playlists(Endpoint):
             raise AuthorizationError(response.json()['detail'])
         return response
 
+    def get_latest(self):
+        response = self.client.get(self.url + '/latest')
+        self._check_common_exceptions(response)
+        if response.status_code == 404:
+            raise NotFoundError(response.json()['detail'])
+        elif response.status_code == 403:
+            raise AuthorizationError(response.json()['detail'])
+        return response
+
     def patch(self, id: str, title: str | None = None, privacy_status: str | None = None):
         if title is None and privacy_status is None:
             return

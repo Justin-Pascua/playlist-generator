@@ -7,6 +7,8 @@ from .exceptions import (AuthenticationError, AuthorizationError, NotFoundError,
                          ConflictError, VideoLinkParserError, PartialOperationWarning)
 from . import utils
 
+
+TAB_STR = " "*4
 class APIWrapper():
     def __init__(self, YT_API_KEY: str = None):
         self.client = httpx.Client(follow_redirects = True,
@@ -28,12 +30,12 @@ class APIWrapper():
     # AUTH
     def login(self, username: str, password: str):
         response = self.authentication.post(username, password)
-        print("Successfully logged in")
         self.client.headers["authorization"] = f"Bearer {response.json()['access_token']}"     
+        return {'detail': 'Successfully logged in'}
 
     def create_user(self, username: str, password: str):
         response = self.users.post(username, password)
-        print("User successfully created")
+        return {'detail': 'User successfully created'}
 
     # READ
     def get_all_songs(self):
@@ -48,31 +50,61 @@ class APIWrapper():
         except NotFoundError:
             return []
 
-    def print_all_songs(self):
+    def get_latest_playlist(self):
+        try:
+            return self.playlists.get_latest().json()
+        except NotFoundError:
+            return None
+
+    def summarize_all_songs(self, print_result: bool = False):
         all_songs = self.get_all_songs()
+
+        output_str = ""
         if len(all_songs) == 0:
-            print("No songs in your database!")
-            return 
+            output_str += "No songs in your database!"
+            if print_result:
+                print(output_str)
+            else:
+                return {"detail": output_str}
         
         for song in all_songs:
-            print(f"Song: '{song['title']}'")
-            print(f"  Video: {song['link']}")
-            print(f"  Alternate titles: ")
-            for alt_title in song['alt_names']:
-                print(f"  - '{alt_title['title']}'")
-            print("")
+            canonical_title = song['title']
+            alt_names = [f"'{item['title']}'" for item in song['alt_names'] if item['title'] != canonical_title]
+            link = song['link']
+
+            output_str += f"Song: '{canonical_title}'" 
+            if len(alt_names) > 0:
+                output_str += "\n" + TAB_STR + "Alternate titles: " + ", ".join(alt_names)
+
+            output_str += "\n"
+            output_str += TAB_STR + f"Video: {link}"
+            output_str += "\n"
+
+        if print_result:
+            print(output_str)
+        else:
+            return {"detail": output_str}
             
-    def print_all_playlists(self):
+    def summarize_all_playlists(self, print_result: bool = False):
         all_playlists = self.get_all_playlists()
+        output_str = ""
         if len(all_playlists) == 0:
-            print("No playlists in your database!") 
-            return
+            output_str += "No playlists in your database!" 
+            if print_result:
+                print(output_str)
+            else:
+                return {"detail": output_str}
 
         for playlist in all_playlists:
-            print(f"Title: '{playlist['playlist_title']}'")
-            print(f"  Link: {playlist['link']}")
-            print(f"  Created at: {playlist['created_at']}")
-            print("")
+            output_str += f"Title: '{playlist['playlist_title']}' \n"
+            output_str += f"  Link: {playlist['link']} \n"
+            output_str += f"  Created at: {playlist['created_at']} \n"
+            output_str += "\n"
+
+        if print_result:
+            print(output_str)
+        else:
+            return {"detail": output_str}
 
 
     # SEARCH
@@ -181,8 +213,7 @@ class APIWrapper():
         try:
             new_song_response = self.songs.post(title)
         except ConflictError:
-            print(f"Operation aborted. There is already a song with the title '{title}'!")
-            return
+            return {"detail": f"Operation aborted. There is already a song with the title '{title}'!"}
 
         # insert alt names
         if alt_names is None:
@@ -193,10 +224,10 @@ class APIWrapper():
                 self.alt_names.post(title = alt_name,
                                     canonical_id = new_song_response.json()['id'])
             except ConflictError:
-                print(f"'{alt_name}' will not be written in as it already exists in the database!")
+                return {"detail": f"'{alt_name}' will not be written in as it already exists in the database!"}
 
         if video_link is None:
-            return
+            return {"detail": "Successfully added song to database!"}
         
         # insert video
         try:
@@ -211,10 +242,11 @@ class APIWrapper():
                 video_title = video['video_title'],
                 channel_name = video['channel_name']
                 )
+            return {"detail": "Successfully added song to database!"}
         except VideoLinkParserError as e:
-            print(f"Song created, but video not inserted. {e}")
+            return {"detail": f"Song created, but video not inserted. {e}"}
         except ValueError as e:
-            print(f"Song created, but video not inserted. {e}")
+            return {"detail": f"Song created, but video not inserted. {e}"}
         
     
     # PLAYLIST OPERATIONS
@@ -222,15 +254,14 @@ class APIWrapper():
         try:
             playlist = self._db_search_playlist(old_title)
         except NotFoundError:
-            print(f"Aborted operation. Could not find playlist with title '{old_title}'!")
-            return
-
+            return {"detail": f"Aborted operation. Could not find playlist with title '{old_title}'!"}
+            
         try:
             self.playlists.patch(id = playlist['id'],
                                  title = new_title)
-            print(f"Successfully changed playlist title!")
+            return {"detail": f"Successfully changed playlist title!"}
         except:
-            print(f"Abandoned operation. Unexpected error while calling YouTube Data API")
+            return {"detail": f"Abandoned operation. Unexpected error while calling YouTube Data API"}
             
     def add_to_playlist(self, playlist_title: str, video_link: str, record_in_db: bool = False):
         self._check_yt_api_key()
@@ -238,31 +269,27 @@ class APIWrapper():
         try:
             playlist = self._db_search_playlist(playlist_title)
         except NotFoundError:
-            print(f"Aborted operation. Could not find playlist titled '{playlist_title}'!")
-            return
+            return {"detail": f"Aborted operation. Could not find playlist titled '{playlist_title}'!"} 
         
         # get yt video by calling yt data api
         try:
             video_id = utils.extract_video_id(video_link)
             video = utils.get_video_details(video_id, self.YT_API_KEY)
         except VideoLinkParserError as e:
-            print(f"Aborted operation. {e}")
-            return
+            return {"detail": f"Aborted operation. {e}"}
+            
         except:
-            print(f"Aborted operation. Unexpected error while calling YouTube Data API")
-            return
+            return {"detail": f"Aborted operation. Unexpected error while calling YouTube Data API"}
         
         # insert into playlist
         try:
             self.playlists.post_item(id = playlist['id'],
                                      video_id = video['id'])
         except:
-            print("Unexpected error occured while calling YouTube Data API")
-            return
+            return {"detail": "Unexpected error occured while calling YouTube Data API"}
         
         if not record_in_db:
-            print("Successfully added video!")
-            return
+            return {"detail": "Successfully added video!"}
 
         # try creating new song for provided video
         try:
@@ -278,7 +305,7 @@ class APIWrapper():
                                  video_id = video['id'],
                                  video_title = video['video_title'],
                                  channel_name = video['channel_name'])
-        print("Successfully added video!")
+        return {"detail": "Successfully added video!"}
 
     def replace_vid_in_playlist(self, playlist_title: str, pos: int, video_link: str, record_in_db: bool = False):
         self._check_yt_api_key()
@@ -286,18 +313,18 @@ class APIWrapper():
         try:
             playlist = self._db_search_playlist(playlist_title)
         except NotFoundError:
-            print(f"Aborted operation. Could not find playlist titled '{playlist_title}'!")
-            return
+            return {"detail": f"Aborted operation. Could not find playlist titled '{playlist_title}'!"}
+            
         # get yt video by calling yt data api
         try:
             video_id = utils.extract_video_id(video_link)
             video = utils.get_video_details(video_id, self.YT_API_KEY)
         except VideoLinkParserError as e:
-            print(f"Aborted operation. {e}")
-            return
+            return {"detail": f"Aborted operation. {e}"}
+            
         except:
-            print(f"Aborted operation. Unexpected error while calling YouTube Data API")
-            return
+            return {"detail": f"Aborted operation. Unexpected error while calling YouTube Data API"}
+            
         # insert video into playlist
         try:
             self.playlists.patch_item(id = playlist['id'],
@@ -306,15 +333,12 @@ class APIWrapper():
                                                      'pos': pos})
         except ValueError as e:
             # raised when init_pos and target_pos are out of bounds 
-            print(f"Aborted operation. {e}")
-            return
+            return {"detail": f"Aborted operation. {e}"}
         except:
-            print("Unexpected error occured while calling YouTube Data API")
-            return
+            return {"detail": "Unexpected error occured while calling YouTube Data API"}
         
         if not record_in_db:
-            print("Successfully replaced video!")
-            return
+            return {"detail": "Successfully replaced video!"}
 
         # try creating new song for provided video
         try:
@@ -330,14 +354,13 @@ class APIWrapper():
                                  video_id = video['id'],
                                  video_title = video['video_title'],
                                  channel_name = video['channel_name'])
-        print("Successfully replaced video!")
+        return {"detail": "Successfully replaced video!"}
         
     def move_vid_in_playlist(self, playlist_title: str, init_pos: int, target_pos: int):
         try:
             playlist = self._db_search_playlist(playlist_title)
         except NotFoundError:
-            print(f"Aborted operation. Could not find playlist titled '{playlist_title}'!")
-            return
+            return {"detail": f"Aborted operation. Could not find playlist titled '{playlist_title}'!"}
         
         try:
             self.playlists.patch_item(id = playlist['id'],
@@ -346,32 +369,27 @@ class APIWrapper():
                                                      'target_pos': target_pos})
         except ValueError as e:
             # raised when init_pos and target_pos are out of bounds 
-            print(f"Aborted operation. {e}")
-            return
+            return {"detail": f"Aborted operation. {e}"}
         except:
-            print("Unexpected error occured while calling YouTube Data API")
-            return
+            return {"detail": "Unexpected error occured while calling YouTube Data API"}
         
-        print("Successfully edited playlist!")
+        return {"detail": "Successfully edited playlist!"}
 
     def remove_from_playlist(self, playlist_title: str, pos: int):
         try:
             playlist = self._db_search_playlist(playlist_title)
         except NotFoundError:
-            print(f"Aborted operation. Could not find playlist titled '{playlist_title}'!")
-            return
+            return {"detail": f"Aborted operation. Could not find playlist titled '{playlist_title}'!"}
         
         try:
             self.playlists.delete_item(playlist['id'], pos)
         except ValueError as e:
             # raised when pos is out of bounds 
-            print(f"Playlist not edited. {e}")
-            return
+            return {"detail": f"Playlist not edited. {e}"}
         except:
-            print("Unexpected error occured while calling YouTube Data API")
-            return
+            return {"detail": "Unexpected error occured while calling YouTube Data API"}
         
-        print("Successfuly removed video from playlist!")
+        return {"detail": "Successfuly removed video from playlist!"}
 
     # SONG MANAGEMENT
     def merge_songs(self, priority_song: str, other_song: str):
@@ -379,55 +397,49 @@ class APIWrapper():
         try:
             song1 = self._db_search_song(priority_song)
         except NotFoundError:
-            print(f"Merge failed. Could not find song with the title '{priority_song}'")
-            return
+            return {"detail": f"Merge failed. Could not find song with the title '{priority_song}'"}
         try:
             song2 = self._db_search_song(other_song)
         except NotFoundError:
-            print(f"Merge failed. Could not find song with the title '{other_song}'")
-            return
+            return {"detail": f"Merge failed. Could not find song with the title '{other_song}'"}
 
         self.songs.merge([song2['id']], song1['id'])
-        print('Songs successfully merged')
+        return {"detail": "Songs successfully merged"}
         
     def splinter_song(self, target_song: str):
         try:
             alt_name = self.alt_names.get(query_str = target_song).json()[0]
         except NotFoundError:
-            print(f"Splinter failed. Could not find the alternate title '{alt_name}'")
-            return
+            return {"detail": f"Splinter failed. Could not find the alternate title '{alt_name}'"}
         
         try:
             self.songs.splinter(alt_name['id'])
-            print('Song successfully splintered')
+            return {"detail": "Song successfully splintered"}
         except ConflictError as e:
-            print(f"Splinter failed. {e}")
-            return
+            return {"detail": "Splinter failed. {e}"}
 
     def delete_song(self, title: str):
         try:
             song = self._db_search_song(title)
             self.songs.delete(song['id'])
         except NotFoundError:
-            print(f"Song '{title}' not found!")
-            return
-        print("Successfully deleted song!")
+            return {"detail": f"Song '{title}' not found!"}
+        return {"detail": "Successfully deleted song!"}
 
     def add_alt_names(self, target_title: str, alt_names: List[str]):
         song = None
         try:
             song = self._db_search_song(target_title)
         except NotFoundError:
-            print(f"Found no song with the title '{target_title}!'")
-            return
+            return {"detail": f"Found no song with the title '{target_title}!'"}
         
         for alt_name in alt_names:
             try:
                 self.alt_names.post(alt_name, song['id'])
             except ConflictError:
-                print(f"The title '{alt_name}' is already assigned to a song!")
+                return {"detail": f"The title '{alt_name}' is already assigned to a song!"}
         
-        print("Successfully added alt titles!")
+        return {"detail": "Successfully added alt titles!"}
 
     def delete_alt_names(self, alt_names: List[str]):
         for alt_name in alt_names:
@@ -435,30 +447,26 @@ class APIWrapper():
                 target = self.alt_names.get(query_str = alt_name).json()[0]
                 self.alt_names.delete(target['id'])
             except NotFoundError:
-                print(f"Alt title '{alt_name}' not found!")
-                return
+                return {"detail": f"Alt title '{alt_name}' not found!"}
             except ConflictError:
-                print(f"Cannot delete the title '{alt_name}' because it is the canonical title of the overlying song!")
-                return
+                return {"detail": f"Cannot delete the title '{alt_name}' because it is the canonical title of the overlying song!"}
             
-        print("Successfully deleted alternate titles!")
+        return {"detail": "Successfully deleted alternate titles!"}
 
     def modify_title(self, old_title: str, new_title: str):
         try:
             song = self._db_search_song(old_title)
         except NotFoundError:
-            print(f"Update failed. Could not find song with title '{old_title}'")
-            return
+            return {"detail": f"Update failed. Could not find song with title '{old_title}'"}
         
         try:
             self.songs.patch(song['id'], new_title)
             alt_name = self._db_search_alt(old_title)
             self.alt_names.patch(alt_name['id'], new_title)
         except ConflictError:
-            print(f"Update failed. The title '{new_title}' is already taken!")
-            return
+            return {"detail": f"Update failed. The title '{new_title}' is already taken!"}
         
-        print("Successfully updated song title!")
+        return {"detail": "Successfully updated song title!"}
   
     def assign_video(self, song_title: str, video_link: str):
         try:
@@ -469,11 +477,9 @@ class APIWrapper():
                                  video['id'],
                                  video['video_title'],
                                  video['channel_name'])
-            print("Successfully assigned video!")
+            return {"detail": "Successfully assigned video!"}
         except NotFoundError:
-            print(f"Assignment failed. Could not find song with title '{song_title}'")
-            return
+            return {"detail": f"Assignment failed. Could not find song with title '{song_title}'"}
         except VideoLinkParserError:
-            print(f"Assignment failed. Could not identify video id from the provided link. Please try a different link format")
-            return
+            return {"detail": f"Assignment failed. Could not identify video id from the provided link. Please try a different link format"}
         
