@@ -33,4 +33,10 @@ def login(user_credentials: OAuth2PasswordRequestForm = Depends(),
     return {'access_token': access_token,
             'token_type': 'bearer'}
 
+@router.get('/')
+def auth_ping(current_user = Depends(auth_utils.get_current_user)):
+    """
+    Check that current user is valid
+    """
+    return {"detail": "success"}
     
