@@ -53,7 +53,7 @@ async def get_recent_playlist(db: Session = Depends(get_db),
             .where(Playlist.user_id == current_user.id)
             .order_by(desc(Playlist.created_at)))
     playlist = db.execute(stmt).scalars().first()
-    print(playlist)
+    
     if not playlist:
         raise HTTPException(status_code = status.HTTP_404_NOT_FOUND,
                             detail = f"Playlist not found")

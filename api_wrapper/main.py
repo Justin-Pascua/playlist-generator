@@ -56,7 +56,7 @@ class APIWrapper():
         except NotFoundError:
             return None
 
-    def summarize_all_songs(self, print_result: bool = False):
+    def summarize_songs(self, print_result: bool = False):
         all_songs = self.get_all_songs()
 
         output_str = ""
@@ -85,8 +85,14 @@ class APIWrapper():
         else:
             return {"detail": output_str}
             
-    def summarize_all_playlists(self, print_result: bool = False):
-        all_playlists = self.get_all_playlists()
+    def summarize_playlists(self, latest_only: bool = True, print_result: bool = False):
+        all_playlists = None
+        if latest_only:
+            all_playlists = self.get_latest_playlist()
+            all_playlists = [all_playlists] # turn into list with one element for compatibility
+        else:
+            all_playlists = self.get_all_playlists()
+
         output_str = ""
         if len(all_playlists) == 0:
             output_str += "No playlists in your database!" 
