@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Response, status, HTTPException, Depends, APIRouter
 
-from sqlalchemy import select, update, func
+from sqlalchemy import select, update, func, desc
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.dialects.mysql import JSON
@@ -46,12 +46,15 @@ async def get_all_songs(query_str: str = None,
                 func.cast("[]", JSON),
             ).label("alt_names"),
         )
+        .where(Canonical.user_id == current_user.id)
+        .where(AltName.user_id == current_user.id)      # needed to address case where no alt names found
         .join(Video, Canonical.id == Video.canonical_name_id, isouter = True)
-        .join(AltName, Canonical.id == AltName.canonical_id, isouter = True)
+        .join(AltName, Canonical.id == AltName.canonical_id, isouter = True)        
         .group_by(Canonical.id, Canonical.title, Video.link))
     
     if query_str is not None:
         stmt = stmt.having(func.sum(AltName.title == query_str) > 0)
+    stmt = stmt.order_by(Canonical.title)
 
     result = db.execute(stmt).all() 
     
