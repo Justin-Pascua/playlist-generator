@@ -1,11 +1,12 @@
-from fastapi import FastAPI, Response, status, HTTPException, Depends, APIRouter
+from fastapi import FastAPI, Response, status, HTTPException, Depends, APIRouter, Query
 
 from sqlalchemy import select, update, func, desc
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.dialects.mysql import JSON
 
-from typing import List, Optional
+from typing import List, Optional, Literal, Annotated
+from pydantic import constr
 
 from ..database import get_db
 from ..schema import (SongSummary, SongCreate, SongMergeRequest, SongSplinterRequest,
@@ -16,6 +17,8 @@ from ..schema import (SongSummary, SongCreate, SongMergeRequest, SongSplinterReq
 from ..models import Canonical, AltName, Video
 from .. import auth_utils
 
+
+
 router = APIRouter(
     prefix = "/songs",
     tags = ['Songs']
@@ -23,7 +26,8 @@ router = APIRouter(
 
 # SONG SUMMARIES
 @router.get("/", response_model = List[SongSummary])
-async def get_all_songs(query_str: str = None,
+async def get_all_songs(query_str: Optional[str] = None,
+                        starts_with: Annotated[str, Query(min_length = 1, max_length = 1)] = None,
                         db: Session = Depends(get_db),
                         current_user = Depends(auth_utils.get_current_user)):
     """
@@ -54,6 +58,8 @@ async def get_all_songs(query_str: str = None,
     
     if query_str is not None:
         stmt = stmt.having(func.sum(AltName.title == query_str) > 0)
+    if starts_with is not None:
+        stmt = stmt.having(Canonical.title.startswith(starts_with))
     stmt = stmt.order_by(Canonical.title)
 
     result = db.execute(stmt).all() 
