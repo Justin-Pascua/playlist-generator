@@ -38,9 +38,14 @@ class APIWrapper():
         return {'detail': 'User successfully created'}
 
     # READ
-    def get_all_songs(self):
+    def get_all_songs(self, starts_with: str = None):
+        if starts_with is not None:
+            if type(starts_with) != str:
+                raise ValueError('starts_with must be a string of length 1')
+            if len(starts_with) > 1:
+                raise ValueError('starts_with must be a string of length 1')
         try:
-            return self.songs.get().json()
+            return self.songs.get(starts_with = starts_with).json()
         except NotFoundError:
             return []
 
@@ -56,8 +61,11 @@ class APIWrapper():
         except NotFoundError:
             return None
 
-    def summarize_songs(self, print_result: bool = False):
-        all_songs = self.get_all_songs()
+    def summarize_songs(self, starts_with: str = None,
+                        include_alts: bool = True,
+                        include_links: bool = True, 
+                        print_result: bool = False):
+        all_songs = self.get_all_songs(starts_with = starts_with)
 
         output_str = ""
         if len(all_songs) == 0:
@@ -69,15 +77,14 @@ class APIWrapper():
         
         for song in all_songs:
             canonical_title = song['title']
-            alt_names = [f"'{item['title']}'" for item in song['alt_names'] if item['title'] != canonical_title]
+            alt_names = [f"{item['title']}" for item in song['alt_names'] if item['title'] != canonical_title]
             link = song['link']
 
-            output_str += f"Song: '{canonical_title}'" 
-            if len(alt_names) > 0:
-                output_str += "\n" + TAB_STR + "Alternate titles: " + ", ".join(alt_names)
-
-            output_str += "\n"
-            output_str += TAB_STR + f"Video: {link}"
+            output_str += f"**Song**: {canonical_title} \n" 
+            if len(alt_names) > 0 and include_alts:
+                output_str += "- *Alternate titles*: " + ", ".join(alt_names) + "\n"
+            if link is not None and include_links:
+                output_str += f"- *Video*: {link} \n"
             output_str += "\n"
 
         if print_result:
@@ -102,7 +109,7 @@ class APIWrapper():
                 return {"detail": output_str}
 
         for playlist in all_playlists:
-            output_str += f"Title: '{playlist['playlist_title']}' \n"
+            output_str += f"Title: {playlist['playlist_title']} \n"
             output_str += f"  Link: {playlist['link']} \n"
             output_str += f"  Created at: {playlist['created_at']} \n"
             output_str += "\n"

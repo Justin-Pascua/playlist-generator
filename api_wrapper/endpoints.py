@@ -155,7 +155,7 @@ class Songs(Endpoint):
 
         return response
 
-    def get(self, id: int = None, query_str: str = None):
+    def get(self, id: int = None, query_str: str = None, starts_with: str = None):
         response = None
         if id is not None:
             response = self.client.get(self.url + f'/{id}')
@@ -163,6 +163,8 @@ class Songs(Endpoint):
             params = dict()
             if query_str is not None:
                 params['query_str'] = query_str
+            if starts_with is not None:
+                params['starts_with'] = starts_with
             response = self.client.get(self.url,
                                        params = params)
         

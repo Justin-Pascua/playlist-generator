@@ -1,9 +1,11 @@
 import discord
 from discord.ext import commands
 from discord import app_commands
+from typing import Optional, List, Literal
+
 from .config import settings
 from api_wrapper.main import APIWrapper
-from typing import Optional, List, Literal
+
 
 # from api_wrapper.main import APIWrapper
 
@@ -12,14 +14,13 @@ YT_API_KEY = settings.YT_API_KEY.get_secret_value()
 SERVER_ID = settings.DISCORD_DEV_SERVER_ID.get_secret_value()
 GUILD_ID = discord.Object(SERVER_ID)
 
-api_client = APIWrapper(YT_API_KEY)
-api_client.login('Admin', 'admin123')
-
 class Client(commands.Bot):
     async def on_ready(self):
         """
         Start up function. Called when bot first runs.
         """        
+        self.api_client = APIWrapper(YT_API_KEY)
+        self.api_client.login('Admin', 'admin123')
         print(f"Logged on as {self.user}!")
         try:
             guild = discord.Object(id = SERVER_ID)
@@ -49,36 +50,50 @@ intents.message_content = True
 
 client = Client(command_prefix = "/", intents = intents)
 
-
-@client.tree.command(name = "hello", description = "Say hello!", guild = GUILD_ID)
-async def say_hello(interaction: discord.Interaction):
-    await interaction.response.send_message("Hello")
-
-@client.tree.command(name = "printer", description = "I will print whatever you give me!", guild = GUILD_ID)
-async def printer(interaction: discord.Interaction, input: str):
-    # specifying a param allows the bot to prompt the user for an argument
-    await interaction.response.send_message(input)
-
-@client.tree.command(name = 'foo', description = 'wuz good foo', guild = GUILD_ID)
-async def foo(interaction: discord.Interaction, x: str, y: int):
-    """
-    Test docstring
-    Args:
-        x: a string 
-        y: an int
-    """
-    await interaction.response.send_message(x * y)
-
 # 'SONGS' COMMANDS
 @client.tree.command(name = 'songs-get', description = 'Get all your songs in the database.', guild = GUILD_ID)
-async def get_songs(interaction: discord.Interaction):
-    pass
+async def get_songs(interaction: discord.Interaction, starts_with: str = None, 
+                    include_alts: Optional[bool] = True, include_links: Optional[bool] = True):
+    """
+    Args:
+        starts_with: type a single letter to get only songs starting with that letter.
+        include_alts: type "False" to exclude alternate names.
+        include_links: type "False" to exclude video links.
+    """
+    if starts_with is not None:
+        if type(starts_with) != str:
+            await interaction.response.send_message('starts_with cannot be more than 1 letter')
+            return
+        if len(starts_with) > 1:
+            await interaction.response.send_message('starts_with cannot be more than 1 letter')
+            return
+    
+    
+    result = client.api_client.summarize_songs(starts_with = starts_with, 
+                                               include_alts = include_alts,
+                                               include_links = include_links)
+    output_str = result['detail']
+    
+    await interaction.response.send_message(output_str)
 
 @client.tree.command(name = 'songs-add', description = 'Add song to the database.', guild = GUILD_ID)
-async def add_song(interaction: discord.Interaction):
-    pass
+async def add_song(interaction: discord.Interaction, title: str, 
+                    alt_titles: Optional[str] = None, video_link: Optional[str] = None):
+    """
+    Args:
+        title: the title of the song 
+        alt_titles: a list of titles separated by semi-colons (e.g. Title 1; Title 2; Title 3)
+        video_link: a link to a YouTube video 
+    """
+    if alt_titles is not None:
+        alt_titles = [title.strip() for title in alt_titles.split(';') if title.strip() != ""]
+    try:
+        response = client.api_client.create_song(title = title, alt_names = alt_titles, video_link = video_link)
+        await interaction.response.send_message(response['detail'])
+    except:
+        await interaction.response.send_message('Unexpected error occurred while interacting with APIWrapper!')
 
-@client.tree.command(name = 'songs-edit', description = 'Edit canonical title of a song.', guild = GUILD_ID)
+@client.tree.command(name = 'songs-edit', description = 'Edit the canonical title of a song.', guild = GUILD_ID)
 async def edit_song(interaction: discord.Interaction):
     pass
 
@@ -87,22 +102,21 @@ async def add_alts(interaction: discord.Interaction):
     pass
 
 @client.tree.command(name = 'songs-remove-alt', description = 'Delete specified alternate titles.', guild = GUILD_ID)
-async def add_song(interaction: discord.Interaction):
+async def remove_alts(interaction: discord.Interaction):
     pass
 
 @client.tree.command(name = 'songs-merge', 
-                     description = 'Merge two songs. This takes all the alternate titles of the second song'
-                     ' and assigns them to the first song. The YouTube link of the second song is discarded.', 
+                     description = 'Take all the alternate titles of song2 and assign them to song1.', 
                      guild = GUILD_ID)
-async def add_song(interaction: discord.Interaction):
+async def merge_songs(interaction: discord.Interaction):
     pass
 
 @client.tree.command(name = 'songs-splinter', description = 'Remove an alternate title of a song and create a new song resource from it.', guild = GUILD_ID)
-async def add_song(interaction: discord.Interaction):
+async def splinter_song(interaction: discord.Interaction):
     pass
 
 @client.tree.command(name = 'songs-assign-video', description = 'Assigns a video to a song.', guild = GUILD_ID)
-async def add_song(interaction: discord.Interaction):
+async def assign_video(interaction: discord.Interaction):
     pass
 
 # 'PLAYLISTS' COMMANDS

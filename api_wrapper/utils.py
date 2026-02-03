@@ -46,10 +46,10 @@ YOUTUBE_NETLOCS = {
 def extract_video_id(url: str):
     """
     Extract a YouTube video ID from many possible URL formats.
-    Returns None if no ID can be found.
+    Raises VideoLinkParserError if no ID can be found.
     """
     if not url:
-        return None
+        raise VideoLinkParserError(f"Could not find video id within the link {url}")
 
     parsed = urlparse(url)
 
@@ -58,7 +58,7 @@ def extract_video_id(url: str):
         return parsed.path.lstrip("/") or None
 
     if parsed.netloc not in YOUTUBE_NETLOCS:
-        return None
+        raise VideoLinkParserError(f"Could not find video id within the link {url}")
 
     # Standard watch URLs
     if parsed.path == "/watch":
