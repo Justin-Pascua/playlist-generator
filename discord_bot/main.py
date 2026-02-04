@@ -7,8 +7,10 @@ import pandas as pd
 import io
 import asyncio
 from typing import Optional, List, Literal
+import datetime as dt
 
 from .config import settings
+from . import utils
 from api_wrapper.main import APIWrapper
 
 
@@ -60,9 +62,9 @@ async def summarize_songs(interaction: discord.Interaction, starts_with: str = N
                           include_alts: Optional[bool] = True, include_links: Optional[bool] = True):
     """
     Args:
-        starts_with: type a single letter to get only songs starting with that letter.
-        include_alts: type "False" to exclude alternate names.
-        include_links: type "False" to exclude video links.
+        starts_with: Type a single letter to get only songs starting with that letter.
+        include_alts: Type "False" to exclude alternate names.
+        include_links: Type "False" to exclude video links.
     """
     if starts_with is not None:
         if type(starts_with) != str:
@@ -77,20 +79,32 @@ async def summarize_songs(interaction: discord.Interaction, starts_with: str = N
         response = client.api_client.summarize_songs(starts_with = starts_with, 
                                                      include_alts = include_alts,
                                                      include_links = include_links)
-    except:
-        response = {'detail': 'Unexpected error occurred while interacting with the main API!'}        
-    
-    await interaction.followup.send(response['detail'],
-                                    suppress_embeds = True)
+        output_str = response['detail']
+        if len(output_str) < 2000:
+            await interaction.followup.send(output_str,
+                                            suppress_embeds = True)
+            return
+        
+        output_chunks = utils.partition_song_summary_str(output_str, slack = 100)
+        for i, chunk in enumerate(output_chunks):
+            await interaction.followup.send(
+                f"**__Part {i+1}/{len(output_chunks)}__** \n{chunk}",
+                suppress_embeds = True
+            )
+
+
+    except Exception as e:
+        await interaction.followup.send(f"Unexpected error occurred. {str(e)}")
+        return
 
 @client.tree.command(name = 'add-song', description = 'Add song to the database.', guild = GUILD_ID)
 async def create_song(interaction: discord.Interaction, title: str, 
                       alt_titles: Optional[str] = None, video_link: Optional[str] = None):
     """
     Args:
-        title: the title of the song 
-        alt_titles: a list of titles separated by semi-colons (e.g. Title 1; Title 2; Title 3)
-        video_link: a link to a YouTube video 
+        title: The title of the song. 
+        alt_titles: A list of titles separated by semi-colons (e.g. Title 1; Title 2; Title 3).
+        video_link: A link to a YouTube video. 
     """
     if alt_titles is not None:
         alt_titles = [title.strip() for title in alt_titles.split(';') if title.strip() != ""]
@@ -112,8 +126,8 @@ async def create_song(interaction: discord.Interaction, title: str,
 async def modify_title(interaction: discord.Interaction, old_title: str, new_title: str):
     """
     Args:
-        old_title: the current title of the song
-        new_title: the new title to be assigned 
+        old_title: The current title of the song you want to edit.
+        new_title: The new title to be assigned. 
     """
     await interaction.response.defer(thinking = True)
     try:
@@ -126,8 +140,8 @@ async def modify_title(interaction: discord.Interaction, old_title: str, new_tit
 async def add_alt_names(interaction: discord.Interaction, song_title: str, alt_titles: str):
     """
     Args: 
-        song_title: title of the song you want to modify
-        alt_titles: a list of alternate titles separated by semi-colons (e.g. Title 1; Title 2; Title 3)
+        song_title: The title of the song you want to modify.
+        alt_titles: A list of alternate titles separated by semi-colons (e.g. Title 1; Title 2; Title 3).
     """
     
     alt_titles = [title.strip() for title in alt_titles.split(';') if title.strip() != ""]
@@ -146,7 +160,7 @@ async def add_alt_names(interaction: discord.Interaction, song_title: str, alt_t
 async def delete_alt_names(interaction: discord.Interaction, alt_title: str):
     """
     Args: 
-        alt_titles: the title to be deleted
+        alt_titles: The title to be deleted.
     """
     await interaction.response.defer(thinking = True)
     try:
@@ -162,8 +176,8 @@ async def delete_alt_names(interaction: discord.Interaction, alt_title: str):
 async def merge_songs(interaction: discord.Interaction, priority_song: str, other_song: str):
     """
     Args:
-        priority_song: title of the song whose link and canonical title will be kept
-        other_song: title of the song which will be merged into `priority_song`. 
+        priority_song: Title of the song whose link and canonical title will be kept.
+        other_song: Title of the song which will be merged into `priority_song`. 
             Note that if this song has been assigned a video, then it will be discarded after merging.
     """
     await interaction.response.defer(thinking = True)
@@ -177,7 +191,7 @@ async def merge_songs(interaction: discord.Interaction, priority_song: str, othe
 async def splinter_song(interaction: discord.Interaction, alt_title: str):
     """
     Args:
-        alt_title: the alternate title that will be splintered off of its song
+        alt_title: The alternate title that will be splintered off of its song.
     """
     await interaction.response.defer(thinking = True)
     try:
@@ -190,8 +204,8 @@ async def splinter_song(interaction: discord.Interaction, alt_title: str):
 async def assign_video(interaction: discord.Interaction, song_title: str, video_link: str):
     """
     Args:
-        song_title: the title of song that will be assigned the video
-        video_link: a link to a YouTube video
+        song_title: The title of song that will be assigned the video.
+        video_link: A link to a YouTube video.
     """
     await interaction.response.defer(thinking = True)
     try:
@@ -205,10 +219,10 @@ async def assign_video(interaction: discord.Interaction, song_title: str, video_
 async def generate_playlist(interaction: discord.Interaction, playlist_title: str, song_titles: str, privacy_status: Literal['public', 'private', 'unlisted'] = 'private',):
     """
     Args:
-        playlist_title: the title assigned to the playlist
-        song_titles: a semi-colon separated list of titles of the songs to be added to the playlist
-            (e.g. Title 1; Title 2; Title 3)
-        privacy_status: the privacy status of the playlist
+        playlist_title: The title assigned to the playlist.
+        song_titles: A semi-colon separated list of titles of the songs to be added to the playlist
+            (e.g. Title 1; Title 2; Title 3).
+        privacy_status: The privacy status of the playlist.
     """
     await interaction.response.defer(thinking = True)
     song_titles = [title.strip() for title in song_titles.split(';') if title.strip() != ""]
@@ -216,7 +230,8 @@ async def generate_playlist(interaction: discord.Interaction, playlist_title: st
         response = client.api_client.generate_playlist(title = playlist_title,
                                                        privacy_status = privacy_status,
                                                        song_titles = song_titles)
-        output_str = f"Link: {response['content']['link']} \n"
+        output_str = f"Title: {response['content']['playlist_title']} \n"
+        output_str += f"Link: {response['content']['link']} \n"
         output_str += f"Summary: \n"
         for song, message in zip(song_titles, response['detail']):
             output_str += f"- {song}: {message} \n"
@@ -230,7 +245,7 @@ async def generate_playlist(interaction: discord.Interaction, playlist_title: st
 async def summarize_playlists(interaction: discord.Interaction, mode: Literal['all', 'recent'] = 'recent'):
     """
     Args:
-        mode: type "all" to get all playlists you've created, or "recent" to get the most recent playlist.
+        mode: Type "all" to get all playlists you've created, or "recent" to get the most recent playlist.
     """
     await interaction.response.defer(thinking = True)
     try:
@@ -245,8 +260,8 @@ async def summarize_playlists(interaction: discord.Interaction, mode: Literal['a
 async def edit_playlist_title(interaction: discord.Interaction, old_title: str, new_title: str):
     """
     Args:
-        old_title: the current title of the playlist, used to identify the playlist
-        new_title: the new title to be assigned to the playlist
+        old_title: The current title of the playlist you want to edit.
+        new_title: The new title to be assigned to the playlist.
     """
     await interaction.response.defer(thinking = True)
     try:
@@ -261,8 +276,8 @@ async def edit_playlist_title(interaction: discord.Interaction, old_title: str, 
 async def add_to_playlist(interaction: discord.Interaction, playlist_title: str, video_link: str):
     """
     Args:
-        playlist_title: the title of the playlist. 
-        video_link: the link of the video to be added.
+        playlist_title: The title of the playlist you want to edit. 
+        video_link: The link of the video to be added.
     """
     await interaction.response.defer(thinking = True)
     try:
@@ -277,9 +292,9 @@ async def add_to_playlist(interaction: discord.Interaction, playlist_title: str,
 async def replace_vid_in_playlist(interaction: discord.Interaction, playlist_title: str, position: int, video_link: str):
     """
     Args:
-        playlist_title: the title of the playlist.
-        position: the position of the video that should be replaced (e.g. if you want to replace the second video, then enter 2). 
-        video_link: the link of the video to be added.
+        playlist_title: The title of the playlist.
+        position: The position of the video that should be replaced (e.g. if you want to replace the second video, then enter 2). 
+        video_link: The link of the video to be added.
     """
     await interaction.response.defer(thinking = True)
     try:
@@ -291,15 +306,14 @@ async def replace_vid_in_playlist(interaction: discord.Interaction, playlist_tit
         response = {'detail': 'Unexpected error occurred while interacting with the main API!'}
     await interaction.followup.send(response['detail'])
     
-
 @client.tree.command(name = 'move-in-playlist', description = 'Move a video within existing playlist.', guild = GUILD_ID)
 async def move_vid_in_playlist(interaction: discord.Interaction, playlist_title: str, initial_position: int, final_position: int):
     """
     Args:
-        playlist_title: the title of the playlist.
-        initial_position: the current position of the video within the playlist 
+        playlist_title: The title of the playlist you want to edit.
+        initial_position: The current position of the video within the playlist 
             (e.g. if you want to move the second video in the plalyist, set this to 2).
-        final_position: the position you want to move the video to
+        final_position: The position you want to move the video to
             (e.g. if you want to move the video to be the third in the playlist, set this to 3).
     """
     await interaction.response.defer(thinking = True)
@@ -316,8 +330,8 @@ async def move_vid_in_playlist(interaction: discord.Interaction, playlist_title:
 async def remove_from_playlist(interaction: discord.Interaction, playlist_title: str, position: int):
     """
     Args:
-        playlist_title: the title of the playlist.
-        position: the position of the video that should be removed (e.g. if you want to remove the second video, then enter 2). 
+        playlist_title: The title of the playlist you want to edit.
+        position: The position of the video that should be removed (e.g. if you want to remove the second video, then enter 2). 
     """
     await interaction.response.defer(thinking = True)
     try:
@@ -333,7 +347,8 @@ async def remove_from_playlist(interaction: discord.Interaction, playlist_title:
 async def import_csv(interaction: discord.Interaction, file: discord.Attachment):
     """
     Args:
-        file: a .csv file 
+        file: A .csv file containing the songs to be added to the database. 
+            For a formatting guide, see https://docs.google.com/spreadsheets/d/1nRShEulUUMzuYSU3Ju_UkTgAW-cJqx7gKBS5VXy8hdE/edit?usp=sharing
     """
     await interaction.response.defer()
     # verfiy file format
@@ -341,7 +356,7 @@ async def import_csv(interaction: discord.Interaction, file: discord.Attachment)
         await interaction.followup.send("❌ Please upload a .csv file")
         return
     
-    status_msg = await interaction.followup.send("*This might take a while*",
+    status_msg = await interaction.followup.send("*Processing data. This might take a while :/*",
                                                  suppress_embeds = True)
     guide_link = 'https://docs.google.com/spreadsheets/d/1nRShEulUUMzuYSU3Ju_UkTgAW-cJqx7gKBS5VXy8hdE/edit?usp=sharing'
     try:
@@ -349,11 +364,42 @@ async def import_csv(interaction: discord.Interaction, file: discord.Attachment)
         df = pd.read_csv(io.BytesIO(file_bytes))
         if not all(df.columns == ['Song', 'Alt Names', 'Link']):
             await status_msg.edit(
-                content = f"Error: expected the column titles 'Song', 'Alt Names', and 'Link', but got {', '.join(df.columns.to_list())}"
+                content = f"""Error: expected the column titles 'Song', 'Alt Names', and 'Link', 
+                but instead got {', '.join(df.columns.to_list())}. 
+                Please refer to the guide at {guide_link}"""
             )
+            return
+        
+        grouped_df = utils.process_songs_df(df)
+        for i in range(len(grouped_df)):
+            song_details = dict(grouped_df.iloc[i])
+            client.api_client.create_song(**song_details)
+        await status_msg.edit(content = f"Successfully imported all songs into database!")
+        
     except Exception as e:
         await status_msg.edit(content = f"Error: {str(e)}")
 
-
+@client.tree.command(name = 'export-songs', description = 'Export all songs in your database into a .csv file', guild = GUILD_ID)
+async def export_csv(interaction: discord.Interaction):
+    await interaction.response.defer(thinking = True)
+    try:
+        songs = client.api_client.get_all_songs()
+        if len(songs) == 0:
+            await interaction.followup.send(content = "No songs in your database, so no file generated!")
+            return
+        
+        df = utils.json_songs_to_df(songs)
+        csv_string = df.to_csv(index = False)
+        csv_bytes = csv_string.encode('utf-8')
+        csv_file = discord.File(
+            io.BytesIO(csv_bytes),
+            filename = f"{interaction.user.name}_data_{dt.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        )
+        await interaction.followup.send(
+            content = f"Your data is ready!",
+            file = csv_file
+        )
+    except Exception as e:
+        await interaction.followup.send(content = f"Unexpected error occured: {str(e)}")
 
 client.run(TOKEN)
