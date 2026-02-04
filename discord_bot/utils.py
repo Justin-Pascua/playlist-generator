@@ -2,31 +2,9 @@ import pandas as pd
 import numpy as np
 from typing import List
 
-def process_songs_df(songs_df: pd.DataFrame):
-    """
-    Takes in dataframe, constructed from file imported by user, and groups the data to allow for the use of
-    `APIWrapper.create_song`
-    Args:
-        songs_df: a dataframe containing the songs to be added to the database. 
-            This is expected to have the following column names: ['Song', 'Alt Names', 'Link']
-    """
-    # change column names to match param names expected by API wrapper
-    songs_df.rename(columns = {'Song': 'title', 'Alt Names': 'alt_names', 'Link': 'video_link'}, inplace = True)
-
-    songs_df.dropna(how = 'all', inplace = True)
-    songs_df['title'] = songs_df['title'].ffill()
-    
-    # create df where rows are of form (title, [alt_title1, ..., alt_titleN], video_link)
-    grouped_info = songs_df.groupby('title')[['alt_names', 'video_link']].agg({
-        'alt_names': lambda x: list(x,) if any(pd.notna(val) for val in x) else None,
-        'video_link': lambda x: x.dropna().iloc[0] if x.dropna().any() else None,
-    })
-    grouped_info.reset_index(inplace = True)
-    return grouped_info
-
 def json_songs_to_df(songs: List[dict]):
     """
-    Converts a list of dicts of song responses into a dataframe.
+    Converts a list of dicts of song responses into a dataframe. Used for /export-songs command
     Args:
         songs: a list of songs as returned by the main API
     """

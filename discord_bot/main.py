@@ -8,6 +8,7 @@ import io
 import asyncio
 from typing import Optional, List, Literal
 import datetime as dt
+import time
 
 from .config import settings
 from . import utils
@@ -22,12 +23,16 @@ SERVER_ID = settings.DISCORD_DEV_SERVER_ID.get_secret_value()
 GUILD_ID = discord.Object(SERVER_ID)
 
 class Client(commands.Bot):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.api_clients = dict()       # keys are guild id's, values are instances of APIWrapper
+        self.guild_credentials = dict() # keys are guild id's, values are dict of form {'username': ..., 'password': ...}
+        self._YT_API_KEY = YT_API_KEY
+
     async def on_ready(self):
         """
-        Start up function. Called when bot first runs.
+        Start up function. Called after initialization
         """        
-        self.api_client = APIWrapper(YT_API_KEY)
-        self.api_client.login('Admin', 'admin123')
         print(f"Logged on as {self.user}!")
         try:
             guild = discord.Object(id = SERVER_ID)
@@ -37,19 +42,34 @@ class Client(commands.Bot):
             print(f'Error syncing commands: {e}')
         
 
-    async def on_message(self, message):
+    async def get_api_client(self, interaction: discord.Interaction) -> APIWrapper:
         """
-        Called when bot detects a message in server.
+        Fetch an API client specific to a Discord server.
+        If the client exists, then it is fetched from `self.api_clients` and its JWT is refreshed.
+        If the client doesn't exist, then one is created by either logging in or by creating a user. In either case, it will be added to `self.api_clients`
         """
-        # ignores own messages, prevents infinite loop
-        if message.author == self.user:
-            return 
-        
-        if message.content.startswith('hello'):
-            await message.channel.send(f'Hi there {message.author}')
-
-    async def on_reaction_add(self, reaction, user):
-        await reaction.message.channel.send(f"You reacted")
+        # try getting from existing clients
+        try:
+            current_client: APIWrapper = self.api_clients[interaction.guild_id]
+            current_credentials = self.guild_credentials[interaction.guild_id]
+            current_client.login(**current_credentials)
+            return current_client
+        except KeyError:
+            # if not, create new client
+            new_credentials = {'username': f'{interaction.guild.name} {str(interaction.guild_id)[-4:]}',
+                               'password': str(interaction.guild_id)}
+            self.guild_credentials[interaction.guild_id] = new_credentials
+            new_client = APIWrapper(self._YT_API_KEY)
+            try:
+                # try logging in
+                new_client.login(**new_credentials)
+            except ValueError:
+                # if user doesn't exist in main API, then create new user
+                new_client.create_user(**new_credentials)
+                new_client.login(**new_credentials)
+            finally:
+                self.api_clients[interaction.guild_id] = new_client
+                return new_client
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -75,10 +95,11 @@ async def summarize_songs(interaction: discord.Interaction, starts_with: str = N
             return
         
     await interaction.response.defer(thinking = True)
+    api_client = await client.get_api_client(interaction)
     try:
-        response = client.api_client.summarize_songs(starts_with = starts_with, 
-                                                     include_alts = include_alts,
-                                                     include_links = include_links)
+        response = api_client.summarize_songs(starts_with = starts_with, 
+                                              include_alts = include_alts,
+                                              include_links = include_links)
         output_str = response['detail']
         if len(output_str) < 2000:
             await interaction.followup.send(output_str,
@@ -110,8 +131,9 @@ async def create_song(interaction: discord.Interaction, title: str,
         alt_titles = [title.strip() for title in alt_titles.split(';') if title.strip() != ""]
     
     await interaction.response.defer(thinking = True)
+    api_client = await client.get_api_client(interaction)
     try:
-        response = client.api_client.create_song(title = title, alt_names = alt_titles, video_link = video_link)
+        response = api_client.create_song(title = title, alt_names = alt_titles, video_link = video_link)
         output_str = ""
         for i, item in enumerate(response['detail']):
             if i == 0:
@@ -130,8 +152,9 @@ async def modify_title(interaction: discord.Interaction, old_title: str, new_tit
         new_title: The new title to be assigned. 
     """
     await interaction.response.defer(thinking = True)
+    api_client = await client.get_api_client(interaction)
     try:
-        response = client.api_client.modify_title(old_title, new_title)
+        response = api_client.modify_title(old_title, new_title)
     except:
         response = {'detail': 'Unexpected error occurred while interacting with the main API!'}
     await interaction.followup.send(response['detail'])
@@ -146,9 +169,10 @@ async def add_alt_names(interaction: discord.Interaction, song_title: str, alt_t
     
     alt_titles = [title.strip() for title in alt_titles.split(';') if title.strip() != ""]
     await interaction.response.defer(thinking = True)
+    api_client = await client.get_api_client(interaction)
     try:
-        response = client.api_client.add_alt_names(target_title = song_title, 
-                                                   alt_names = alt_titles)
+        response = api_client.add_alt_names(target_title = song_title, 
+                                            alt_names = alt_titles)
         output_str = ""
         for item in response['detail']:
             output_str += f"- {item} \n"
@@ -163,8 +187,9 @@ async def delete_alt_names(interaction: discord.Interaction, alt_title: str):
         alt_titles: The title to be deleted.
     """
     await interaction.response.defer(thinking = True)
+    api_client = await client.get_api_client(interaction)
     try:
-        response = client.api_client.delete_alt_name(alt_name = alt_title)
+        response = api_client.delete_alt_name(alt_name = alt_title)
     except Exception as e:
         response = {'detail': 'Unexpected error occurred while interacting with the main API!'}
         print(e)
@@ -181,8 +206,9 @@ async def merge_songs(interaction: discord.Interaction, priority_song: str, othe
             Note that if this song has been assigned a video, then it will be discarded after merging.
     """
     await interaction.response.defer(thinking = True)
+    api_client = await client.get_api_client(interaction)
     try:
-        response = client.api_client.merge_songs(priority_song, other_song)
+        response = api_client.merge_songs(priority_song, other_song)
     except:
         response = {'detail': 'Unexpected error occurred while interacting with the main API!'}
     await interaction.followup.send(response['detail'])
@@ -194,8 +220,9 @@ async def splinter_song(interaction: discord.Interaction, alt_title: str):
         alt_title: The alternate title that will be splintered off of its song.
     """
     await interaction.response.defer(thinking = True)
+    api_client = await client.get_api_client(interaction)
     try:
-        response = client.api_client.splinter_song(target_song = alt_title)
+        response = api_client.splinter_song(target_song = alt_title)
     except:
         response = {'detail': 'Unexpected error occurred while interacting with the main API!'}
     await interaction.followup.send(response['detail'])
@@ -208,8 +235,9 @@ async def assign_video(interaction: discord.Interaction, song_title: str, video_
         video_link: A link to a YouTube video.
     """
     await interaction.response.defer(thinking = True)
+    api_client = await client.get_api_client(interaction)
     try:
-        response = client.api_client.assign_video(song_title, video_link)
+        response = api_client.assign_video(song_title, video_link)
     except:
         response = {'detail': 'Unexpected error occurred while interacting with the main API!'}
     await interaction.followup.send(response['detail'])
@@ -225,11 +253,12 @@ async def generate_playlist(interaction: discord.Interaction, playlist_title: st
         privacy_status: The privacy status of the playlist.
     """
     await interaction.response.defer(thinking = True)
+    api_client = await client.get_api_client(interaction)
     song_titles = [title.strip() for title in song_titles.split(';') if title.strip() != ""]
     try:
-        response = client.api_client.generate_playlist(title = playlist_title,
-                                                       privacy_status = privacy_status,
-                                                       song_titles = song_titles)
+        response = api_client.generate_playlist(title = playlist_title,
+                                                privacy_status = privacy_status,
+                                                song_titles = song_titles)
         output_str = f"Title: {response['content']['playlist_title']} \n"
         output_str += f"Link: {response['content']['link']} \n"
         output_str += f"Summary: \n"
@@ -248,8 +277,9 @@ async def summarize_playlists(interaction: discord.Interaction, mode: Literal['a
         mode: Type "all" to get all playlists you've created, or "recent" to get the most recent playlist.
     """
     await interaction.response.defer(thinking = True)
+    api_client = await client.get_api_client(interaction)
     try:
-        response = client.api_client.summarize_playlists(latest_only = (mode == 'recent'))
+        response = api_client.summarize_playlists(latest_only = (mode == 'recent'))
     except:
         response = {'detail': 'Unexpected error occurred while interacting with the main API!'}
     await interaction.followup.send(response['detail'],
@@ -264,8 +294,9 @@ async def edit_playlist_title(interaction: discord.Interaction, old_title: str, 
         new_title: The new title to be assigned to the playlist.
     """
     await interaction.response.defer(thinking = True)
+    api_client = await client.get_api_client(interaction)
     try:
-        response = client.api_client.edit_playlist_title(old_title, new_title)
+        response = api_client.edit_playlist_title(old_title, new_title)
     except:
         response = {'detail': 'Unexpected error occurred while interacting with the main API!'}
     await interaction.followup.send(response['detail'])
@@ -280,10 +311,11 @@ async def add_to_playlist(interaction: discord.Interaction, playlist_title: str,
         video_link: The link of the video to be added.
     """
     await interaction.response.defer(thinking = True)
+    api_client = await client.get_api_client(interaction)
     try:
-        response = client.api_client.add_to_playlist(playlist_title = playlist_title,
-                                                     video_link = video_link,
-                                                     record_in_db = True)
+        response = api_client.add_to_playlist(playlist_title = playlist_title,
+                                              video_link = video_link,
+                                              record_in_db = True)
     except:
         response = {'detail': 'Unexpected error occurred while interacting with the main API!'}
     await interaction.followup.send(response['detail'])
@@ -297,11 +329,12 @@ async def replace_vid_in_playlist(interaction: discord.Interaction, playlist_tit
         video_link: The link of the video to be added.
     """
     await interaction.response.defer(thinking = True)
+    api_client = await client.get_api_client(interaction)
     try:
         # subtract 1 from position because we use 0-indexing, while users use 1-indexing
-        response = client.api_client.replace_vid_in_playlist(playlist_title = playlist_title,
-                                                             pos = position - 1,
-                                                             video_link = video_link)
+        response = api_client.replace_vid_in_playlist(playlist_title = playlist_title,
+                                                      pos = position - 1,
+                                                      video_link = video_link)
     except:
         response = {'detail': 'Unexpected error occurred while interacting with the main API!'}
     await interaction.followup.send(response['detail'])
@@ -317,11 +350,12 @@ async def move_vid_in_playlist(interaction: discord.Interaction, playlist_title:
             (e.g. if you want to move the video to be the third in the playlist, set this to 3).
     """
     await interaction.response.defer(thinking = True)
+    api_client = await client.get_api_client(interaction)
     try:
         # subtract 1 from position because we use 0-indexing, while users use 1-indexing
-        response = client.api_client.move_vid_in_playlist(playlist_title = playlist_title,
-                                                          init_pos = initial_position - 1,
-                                                          target_pos = final_position - 1)
+        response = api_client.move_vid_in_playlist(playlist_title = playlist_title,
+                                                   init_pos = initial_position - 1,
+                                                   target_pos = final_position - 1)
     except:
         response = {'detail': 'Unexpected error occurred while interacting with the main API!'}
     await interaction.followup.send(response['detail'])
@@ -334,10 +368,11 @@ async def remove_from_playlist(interaction: discord.Interaction, playlist_title:
         position: The position of the video that should be removed (e.g. if you want to remove the second video, then enter 2). 
     """
     await interaction.response.defer(thinking = True)
+    api_client = await client.get_api_client(interaction)
     try:
         # subtract 1 from position because we use 0-indexing, while users use 1-indexing
-        response = client.api_client.remove_from_playlist(playlist_title = playlist_title,
-                                                          pos = position - 1)
+        response = api_client.remove_from_playlist(playlist_title = playlist_title,
+                                                   pos = position - 1)
     except Exception as e:
         print(e)
         response = {'detail': 'Unexpected error occurred while interacting with the main API!'}
@@ -350,7 +385,8 @@ async def import_csv(interaction: discord.Interaction, file: discord.Attachment)
         file: A .csv file containing the songs to be added to the database. 
             For a formatting guide, see https://docs.google.com/spreadsheets/d/1nRShEulUUMzuYSU3Ju_UkTgAW-cJqx7gKBS5VXy8hdE/edit?usp=sharing
     """
-    await interaction.response.defer()
+    await interaction.response.defer(thinking = True)
+    api_client = await client.get_api_client(interaction)
     # verfiy file format
     if not file.filename.lower().endswith('.csv'):
         await interaction.followup.send("❌ Please upload a .csv file")
@@ -369,21 +405,17 @@ async def import_csv(interaction: discord.Interaction, file: discord.Attachment)
                 Please refer to the guide at {guide_link}"""
             )
             return
-        
-        grouped_df = utils.process_songs_df(df)
-        for i in range(len(grouped_df)):
-            song_details = dict(grouped_df.iloc[i])
-            client.api_client.create_song(**song_details)
-        await status_msg.edit(content = f"Successfully imported all songs into database!")
-        
+        response = api_client.import_songs(df)
+        await status_msg.edit(content = f"{response['detail']}")
     except Exception as e:
-        await status_msg.edit(content = f"Error: {str(e)}")
+        await status_msg.edit(content = f"Error:{type(e)} {e}")
 
 @client.tree.command(name = 'export-songs', description = 'Export all songs in your database into a .csv file', guild = GUILD_ID)
 async def export_csv(interaction: discord.Interaction):
     await interaction.response.defer(thinking = True)
+    api_client = await client.get_api_client(interaction)
     try:
-        songs = client.api_client.get_all_songs()
+        songs = api_client.get_all_songs()
         if len(songs) == 0:
             await interaction.followup.send(content = "No songs in your database, so no file generated!")
             return

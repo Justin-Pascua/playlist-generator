@@ -1,6 +1,7 @@
 import httpx
 import warnings
 from typing import List, Optional
+import pandas as pd
 
 from .endpoints import Endpoint, Authentication, Users, AltNames, Songs, Playlists
 from .exceptions import (AuthenticationError, AuthorizationError, NotFoundError, 
@@ -36,6 +37,7 @@ class APIWrapper():
         return {'status': True}
 
     def login(self, username: str, password: str):
+        # raises 403 if user doesn't exist or bad credentials
         response = self.authentication.post(username, password)
         self.client.headers["authorization"] = f"Bearer {response.json()['access_token']}"     
         return {'detail': 'Successfully logged in'}
@@ -76,7 +78,7 @@ class APIWrapper():
 
         output_str = ""
         if len(all_songs) == 0:
-            output_str += "No songs in your database!"
+            output_str += "No results!"
             if print_result:
                 print(output_str)
             else:
@@ -231,7 +233,9 @@ class APIWrapper():
 
         return response
     
-    def create_song(self, title: str, alt_names: Optional[List[str]] = None, video_link: str = None):
+    def create_song(self, title: str, alt_names: Optional[List[str]] = None, 
+                    video_link: str = None,
+                    video_id: str = None, video_title: str = None, channel_name: str = None):
         final_response = {'detail': []}
         # insert new song resource
         new_song_response = None
@@ -253,28 +257,44 @@ class APIWrapper():
                 final_response['detail'].append(f"'{alt_name}' not added as an alt title because it exists as a title for another song! \n")
 
         # insert video
-        if video_link is None:
-            return final_response
         try:
-            video_id = utils.extract_video_id(video_link)
-
-            self._check_yt_api_key()
-            video = utils.get_video_details(video_id, self.YT_API_KEY)
-            
-            self.songs.put_video(
-                id = new_song_response.json()['id'],
-                video_id = video['id'],
-                video_title = video['video_title'],
-                channel_name = video['channel_name']
+            if all([video_id is not None, video_title is not None, channel_name is not None]):
+                self.songs.put_video(
+                    id = new_song_response.json()['id'],
+                    video_id = video_id,
+                    video_title = video_title,
+                    channel_name = channel_name
                 )
+            elif video_link is not None:
+                video_id = utils.extract_video_id(video_link)
+                self._check_yt_api_key()
+                video = utils.get_video_details(video_id, self.YT_API_KEY) 
+                self.songs.put_video(
+                    id = new_song_response.json()['id'],
+                    video_id = video['id'],
+                    video_title = video['video_title'],
+                    channel_name = video['channel_name']
+                    )
+            elif any([video_id is not None, video_title is not None, channel_name is not None]):
+                final_response['detail'].append(
+                    f"""Video not inserted. Please provide either 
+                    i) a 'video_link', 
+                    or ii) 'id', 'video_title', and 'channel_name'""")
         except VideoLinkParserError as e:
-            final_response["detail"].append(f"video not inserted. {e}")
+            final_response["detail"].append(f"Video not inserted. {e}")
         except ValueError as e:
-            final_response["detail"].append(f"video not inserted. {e}")
+            final_response["detail"].append(f"Video not inserted. {e}")
         
         return final_response
-        
-    
+
+    def import_songs(self, raw_df: pd.DataFrame):
+        self._check_yt_api_key()
+        grouped_df = utils.process_songs_df(raw_df, self.YT_API_KEY)
+        for i in range(len(grouped_df)):
+            song_details = dict(grouped_df.iloc[i])
+            self.create_song(**song_details)
+        return {'detail': 'Successfully imported songs!'}
+
     # PLAYLIST OPERATIONS
     def edit_playlist_title(self, old_title: str, new_title: str):
         try:
@@ -458,7 +478,7 @@ class APIWrapper():
         try:
             song = self._db_search_song(target_title)
         except NotFoundError:
-            response['detail'].append(f"Found no song with the title '{target_title}!'")
+            response['detail'].append(f"Operation aborted. Found no song with the title '{target_title}'!")
             return response
         
         for alt_name in alt_names:

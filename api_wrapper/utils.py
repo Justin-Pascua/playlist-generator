@@ -1,6 +1,8 @@
 from googleapiclient.discovery import build
 from urllib.parse import urlparse, parse_qs, unquote
 from .exceptions import VideoLinkParserError
+import pandas as pd
+import numpy as np
 
 def search_video(query_string: str, api_key: str):
     """
@@ -43,13 +45,19 @@ YOUTUBE_NETLOCS = {
     "www.youtube-nocookie.com",
 }
 
-def extract_video_id(url: str):
+def extract_video_id(url: str, fallback_to_none: bool = False):
     """
     Extract a YouTube video ID from many possible URL formats.
-    Raises VideoLinkParserError if no ID can be found.
+    Args:
+        url: the string to be parsed.
+        fallback_to_none: a bool. If True, then returns None in the case that the parser fails.
+            If False, then raises VideoLinkParserError if no ID can be found.
     """
-    if not url:
-        raise VideoLinkParserError(f"Please try a different link format")
+    if not url or type(url) != str:
+        if fallback_to_none:
+            return None
+        else:
+            raise VideoLinkParserError(f"Please try a different link format")
 
     parsed = urlparse(url)
 
@@ -58,7 +66,10 @@ def extract_video_id(url: str):
         return parsed.path.lstrip("/") or None
 
     if parsed.netloc not in YOUTUBE_NETLOCS:
-        raise VideoLinkParserError(f"Please try a different link format")
+        if fallback_to_none:
+            return None
+        else:
+            raise VideoLinkParserError(f"Please try a different link format")
 
     # Standard watch URLs
     if parsed.path == "/watch":
@@ -96,8 +107,11 @@ def extract_video_id(url: str):
                 return extract_video_id(f"https://www.youtube.com{u}")
             return extract_video_id(u)
 
-    # if all else fails, raise exception
-    raise VideoLinkParserError(f"Please try a different link format")
+    # if all else fails, raise exception or return None
+    if fallback_to_none:
+        return None
+    else:
+        raise VideoLinkParserError(f"Please try a different link format")
 
 def get_video_details(video_id: str, api_key: str):
     """
@@ -124,3 +138,49 @@ def get_video_details(video_id: str, api_key: str):
     
     return result
 
+def process_songs_df(raw_df: pd.DataFrame, api_key: str):
+    # rename cols to match param names expected by APIWrapper.create_song()
+    raw_df.rename(columns = {'Song': 'title', 'Alt Names': 'alt_names', 'Link': 'video_link'}, inplace = True)
+    raw_df.dropna(how = 'all', inplace = True)
+
+    # propogate titles down
+    raw_df['title'] = raw_df['title'].ffill()
+
+    # get video id from links
+    raw_df['video_id'] = raw_df['video_link'].apply(lambda x: extract_video_id(x, True))
+
+    # group based on title
+    grouped_info = raw_df.groupby('title')[['alt_names', 'video_id']].agg({
+        'alt_names': lambda x: list(x,) if any(pd.notna(val) for val in x) else None,
+        'video_id': lambda x: x.dropna().iloc[0] if x.dropna().any() else None,
+    })
+    grouped_info.reset_index(inplace = True)
+
+    # take non-None video ids, and get details from YouTube Data API
+    # make calls in chunks to prevent rate limiting
+    indices = np.array(range(len(grouped_info)))
+    mask = grouped_info['video_id'].notna().values
+    non_none_indices = indices[mask]
+    all_video_ids = grouped_info[mask]['video_id'].values
+
+    video_titles = []
+    channel_names = []
+    chunk_size = 20
+    for i in range((len(all_video_ids) // chunk_size) + 1):
+        current_id_chunk = ','.join(all_video_ids[i*chunk_size: (i+1)*chunk_size])
+        with build('youtube', 'v3', developerKey = api_key) as yt_service:
+            request = yt_service.videos().list(
+                part = 'id,snippet',
+                id = current_id_chunk
+            )
+            response = request.execute()
+            for item in response['items']:
+                video_titles.append(item['snippet']['title'])
+                channel_names.append(item['snippet']['channelTitle'])
+
+    grouped_info['video_title'] = None
+    grouped_info.loc[non_none_indices, 'video_title'] = video_titles
+    grouped_info['channel_name'] = None
+    grouped_info.loc[non_none_indices, 'channel_name'] = channel_names
+
+    return grouped_info
