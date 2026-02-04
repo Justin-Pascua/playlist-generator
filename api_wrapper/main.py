@@ -28,6 +28,13 @@ class APIWrapper():
         self.YT_API_KEY = key
 
     # AUTH
+    def login_status(self):
+        try:
+            response = self.authentication.get()
+        except AuthenticationError:
+            return {'status': False}
+        return {'status': True}
+
     def login(self, username: str, password: str):
         response = self.authentication.post(username, password)
         self.client.headers["authorization"] = f"Bearer {response.json()['access_token']}"     
@@ -109,9 +116,9 @@ class APIWrapper():
                 return {"detail": output_str}
 
         for playlist in all_playlists:
-            output_str += f"Title: {playlist['playlist_title']} \n"
-            output_str += f"  Link: {playlist['link']} \n"
-            output_str += f"  Created at: {playlist['created_at']} \n"
+            output_str += f"**Title**: {playlist['playlist_title']} \n"
+            output_str += f"- *Link*: {playlist['link']} \n"
+            output_str += f"- *Created at*: {playlist['created_at']} \n"
             output_str += "\n"
 
         if print_result:
@@ -154,7 +161,7 @@ class APIWrapper():
         Returns:
             dict: A representation of a video resource, with the form {'id': ..., 'video_title': ..., 'channel_name': ..., 'link': ...}
         """
-        
+        response = {'content': None, 'detail': None}
         # search for song 
         db_search_result = None
         try:
@@ -166,7 +173,9 @@ class APIWrapper():
         if db_search_result is not None:
             try:
                 video_response = self.songs.get_video(db_search_result['id'])   # raises NotFoundError if given song does not have a video
-                return video_response.json()
+                response['content'] = video_response.json() 
+                response['detail'] = 'Fetched from database'
+                return response
             except NotFoundError:
                 # otherwise, search YouTube for video
                 new_video = self._yt_search_video(song_title)
@@ -175,7 +184,9 @@ class APIWrapper():
                                          new_video['id'],
                                          new_video['video_title'],
                                          new_video['channel_name'])
-                return new_video
+                response['content'] = new_video
+                response['detail'] = 'Fetched from YouTube'
+                return response
         
         # case: song not in db
         if db_search_result is None:
@@ -187,62 +198,63 @@ class APIWrapper():
                                          new_video['id'],
                                          new_video['video_title'],
                                          new_video['channel_name'])
-                return new_video
+                response['content'] = new_video
+                response['detail'] = 'Fetched from YouTube'
+                return response
             else:
                 if insert_video_if_na:
                     print("Video will not be inserted into database because song was not found in database and insert_song_if_na was set to False")
-                return self._yt_search_video(song_title)
+                response['content'] = self._yt_search_video(song_title)
+                response['detail'] = 'Fetched from YouTube'
+                return response 
     
     def generate_playlist(self, title: str, privacy_status: str, song_titles: List[str]):
+        response = {'content': None, 'detail': []}
+        
         # ensure that all videos can be obtained without error before creating playlist
         videos = []
         for song_title in song_titles:
-            video = self.smart_search_video(song_title = song_title,
+            search_response = self.smart_search_video(song_title = song_title,
                                             insert_song_if_na = True,
                                             insert_video_if_na = True)
-            videos.append(video)
+            videos.append(search_response['content'])
+            response['detail'].append(search_response['detail'])
 
         # if no error, then create playlist
-        response = dict()
-        response['log'] = dict()
-
         playlist_response = self.playlists.post(title, privacy_status)    
-        response['log']['playlist_status'] = playlist_response.status_code
-        response['playlist'] = playlist_response.json()
+        response['content'] = playlist_response.json()
 
-        response['log']['video_statuses'] = []
         for video in videos:
             insert_response = self.playlists.post_item(
                 id = playlist_response.json()['id'],
                 video_id = video['id'])
-            response['log']['video_statuses'].append(insert_response.status_code)
-    
 
         return response
     
     def create_song(self, title: str, alt_names: Optional[List[str]] = None, video_link: str = None):
+        final_response = {'detail': []}
         # insert new song resource
         new_song_response = None
         try:
             new_song_response = self.songs.post(title)
         except ConflictError:
-            return {"detail": f"Operation aborted. There is already a song with the title '{title}'!"}
+            final_response['detail'].append(f"Operation aborted. There is already a song with the title '{title}'!")
+            return final_response
+        final_response['detail'].append('Song created!')
 
         # insert alt names
         if alt_names is None:
             alt_names = []
-        
         for alt_name in alt_names:
             try:
                 self.alt_names.post(title = alt_name,
                                     canonical_id = new_song_response.json()['id'])
             except ConflictError:
-                return {"detail": f"'{alt_name}' will not be written in as it already exists in the database!"}
+                final_response['detail'].append(f"'{alt_name}' not added as an alt title because it exists as a title for another song! \n")
 
-        if video_link is None:
-            return {"detail": "Successfully added song to database!"}
-        
         # insert video
+        if video_link is None:
+            return final_response
         try:
             video_id = utils.extract_video_id(video_link)
 
@@ -255,11 +267,12 @@ class APIWrapper():
                 video_title = video['video_title'],
                 channel_name = video['channel_name']
                 )
-            return {"detail": "Successfully added song to database!"}
         except VideoLinkParserError as e:
-            return {"detail": f"Song created, but video not inserted. {e}"}
+            final_response["detail"].append(f"video not inserted. {e}")
         except ValueError as e:
-            return {"detail": f"Song created, but video not inserted. {e}"}
+            final_response["detail"].append(f"video not inserted. {e}")
+        
+        return final_response
         
     
     # PLAYLIST OPERATIONS
@@ -417,19 +430,19 @@ class APIWrapper():
             return {"detail": f"Merge failed. Could not find song with the title '{other_song}'"}
 
         self.songs.merge([song2['id']], song1['id'])
-        return {"detail": "Songs successfully merged"}
+        return {"detail": "Songs successfully merged!"}
         
     def splinter_song(self, target_song: str):
         try:
             alt_name = self.alt_names.get(query_str = target_song).json()[0]
         except NotFoundError:
-            return {"detail": f"Splinter failed. Could not find the alternate title '{alt_name}'"}
+            return {"detail": f"Splinter failed. Could not find the alternate title '{target_song}'"}
         
         try:
             self.songs.splinter(alt_name['id'])
-            return {"detail": "Song successfully splintered"}
+            return {"detail": "Song successfully splintered!"}
         except ConflictError as e:
-            return {"detail": "Splinter failed. {e}"}
+            return {"detail": f"Splinter failed. {e}"}
 
     def delete_song(self, title: str):
         try:
@@ -440,31 +453,33 @@ class APIWrapper():
         return {"detail": "Successfully deleted song!"}
 
     def add_alt_names(self, target_title: str, alt_names: List[str]):
+        response = {'detail': []}
         song = None
         try:
             song = self._db_search_song(target_title)
         except NotFoundError:
-            return {"detail": f"Found no song with the title '{target_title}!'"}
+            response['detail'].append(f"Found no song with the title '{target_title}!'")
+            return response
         
         for alt_name in alt_names:
             try:
                 self.alt_names.post(alt_name, song['id'])
+                response['detail'].append(f"Successfully added '{alt_name}'!")
             except ConflictError:
-                return {"detail": f"The title '{alt_name}' is already assigned to a song!"}
+                response['detail'].append(f"Did not add '{alt_name}' because it's already assigned to another song!")
         
-        return {"detail": "Successfully added alt titles!"}
+        return response
 
-    def delete_alt_names(self, alt_names: List[str]):
-        for alt_name in alt_names:
-            try:
-                target = self.alt_names.get(query_str = alt_name).json()[0]
-                self.alt_names.delete(target['id'])
-            except NotFoundError:
-                return {"detail": f"Alt title '{alt_name}' not found!"}
-            except ConflictError:
-                return {"detail": f"Cannot delete the title '{alt_name}' because it is the canonical title of the overlying song!"}
+    def delete_alt_name(self, alt_name: str):
+        try:
+            target = self.alt_names.get(query_str = alt_name).json()[0]
+            self.alt_names.delete(target['id'])
+        except NotFoundError:
+            return {"detail": f"Alt title '{alt_name}' not found!"}
+        except ConflictError:
+            return {"detail": f"Cannot delete the title '{alt_name}' because it is the canonical title of the overlying song!"}
             
-        return {"detail": "Successfully deleted alternate titles!"}
+        return {"detail": f"Successfully deleted the title {alt_name}!"}
 
     def modify_title(self, old_title: str, new_title: str):
         try:

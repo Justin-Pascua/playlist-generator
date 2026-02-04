@@ -31,6 +31,11 @@ class Authentication(Endpoint):
         super().__init__(client)
         self.url = self.base_url + '/authentication'
 
+    def get(self):
+        response = self.client.get(self.url)
+        self._check_common_exceptions(response)
+        return response
+
     def post(self, username: str, password: str):
         response = self.client.post(self.url,
                                     data = {'username': username,

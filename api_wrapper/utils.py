@@ -49,7 +49,7 @@ def extract_video_id(url: str):
     Raises VideoLinkParserError if no ID can be found.
     """
     if not url:
-        raise VideoLinkParserError(f"Could not find video id within the link {url}")
+        raise VideoLinkParserError(f"Please try a different link format")
 
     parsed = urlparse(url)
 
@@ -58,7 +58,7 @@ def extract_video_id(url: str):
         return parsed.path.lstrip("/") or None
 
     if parsed.netloc not in YOUTUBE_NETLOCS:
-        raise VideoLinkParserError(f"Could not find video id within the link {url}")
+        raise VideoLinkParserError(f"Please try a different link format")
 
     # Standard watch URLs
     if parsed.path == "/watch":
@@ -97,7 +97,7 @@ def extract_video_id(url: str):
             return extract_video_id(u)
 
     # if all else fails, raise exception
-    raise VideoLinkParserError(f"Could not find video id within the link {url}")
+    raise VideoLinkParserError(f"Please try a different link format")
 
 def get_video_details(video_id: str, api_key: str):
     """
