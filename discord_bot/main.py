@@ -168,7 +168,7 @@ async def create_song(interaction: discord.Interaction, title: str,
 async def modify_title(interaction: discord.Interaction, old_title: str, new_title: str):
     """
     Args:
-        old_title: The current title of the song you want to edit.
+        old_title: The current title (or one of the alternate titles) of the song you want to edit.
         new_title: The new title to be assigned. 
     """
     await interaction.response.defer(thinking = True)
@@ -184,11 +184,33 @@ async def modify_title(interaction: discord.Interaction, old_title: str, new_tit
         response = {'detail': 'Unexpected error occurred while interacting with the main API!'}
     await interaction.followup.send(response['detail'])
 
+@client.tree.command(name = 'delete-song', 
+                     description = 'Remove a song (along with its associated video and alt titles) from the database.',
+                     guild = GUILD_ID)
+async def delete_song(interaction: discord.Interaction, title: str):
+    """
+    Args:
+        title: The current title (or one of the alternate titles) of the song you want to delete.
+    """
+    await interaction.response.defer(thinking = True)
+    try:
+        api_client = await client.get_api_client(interaction)
+    except httpx.ConnectError as e:
+        await interaction.followup.send(f"Operation aborted. {e}")
+        return 
+
+    try:
+        response = api_client.delete_song(title)
+        output_str = response['detail']
+    except:
+        output_str = 'Unexpected error occurred while interacting with the main API!'
+    await interaction.followup.send(output_str)
+
 @client.tree.command(name = 'add-alt-titles', description = 'Add alternate titles for to a song resource.', guild = GUILD_ID)
 async def add_alt_names(interaction: discord.Interaction, song_title: str, alt_titles: str):
     """
     Args: 
-        song_title: The title of the song you want to modify.
+        song_title: The title (or one of the alternate titles) of the song you want to modify.
         alt_titles: A list of alternate titles separated by semi-colons (e.g. Title 1; Title 2; Title 3).
     """
     
@@ -236,8 +258,8 @@ async def delete_alt_names(interaction: discord.Interaction, alt_title: str):
 async def merge_songs(interaction: discord.Interaction, priority_song: str, other_song: str):
     """
     Args:
-        priority_song: Title of the song whose link and canonical title will be kept.
-        other_song: Title of the song which will be merged into `priority_song`. 
+        priority_song: The title (or one of the alternate titles) of the song whose link and canonical title will be kept.
+        other_song: The title (or one of the alternate titles) of the song which will be merged into `priority_song`. 
             Note that if this song has been assigned a video, then it will be discarded after merging.
     """
     await interaction.response.defer(thinking = True)
@@ -276,7 +298,7 @@ async def splinter_song(interaction: discord.Interaction, alt_title: str):
 async def assign_video(interaction: discord.Interaction, song_title: str, video_link: str):
     """
     Args:
-        song_title: The title of song that will be assigned the video.
+        song_title: The title (or one of the alternate titles) of song that will be assigned the video.
         video_link: A link to a YouTube video.
     """
     await interaction.response.defer(thinking = True)
