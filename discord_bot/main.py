@@ -141,8 +141,6 @@ async def create_song(interaction: discord.Interaction, title: str,
         alt_titles: A list of titles separated by semi-colons (e.g. Title 1; Title 2; Title 3).
         video_link: A link to a YouTube video. 
     """
-    if alt_titles is not None:
-        alt_titles = [title.strip() for title in alt_titles.split(';') if title.strip() != ""]
     
     await interaction.response.defer(thinking = True)
     try:
@@ -152,6 +150,10 @@ async def create_song(interaction: discord.Interaction, title: str,
         return 
     
     try:
+        title = title.strip()
+        if alt_titles is not None:
+            alt_titles = [title.strip() for title in alt_titles.split(';') if title.strip() != ""]
+
         response = api_client.create_song(title = title, alt_names = alt_titles, video_link = video_link)
         output_str = ""
         for i, item in enumerate(response['detail']):
@@ -178,6 +180,7 @@ async def modify_title(interaction: discord.Interaction, old_title: str, new_tit
         return 
     
     try:
+        new_title = new_title.strip()
         response = api_client.modify_title(old_title, new_title)
         await interaction.followup.send(response['detail'])
     except Exception as e:
@@ -212,7 +215,6 @@ async def add_alt_names(interaction: discord.Interaction, song_title: str, alt_t
         alt_titles: A list of alternate titles separated by semi-colons (e.g. Title 1; Title 2; Title 3).
     """
     
-    alt_titles = [title.strip() for title in alt_titles.split(';') if title.strip() != ""]
     await interaction.response.defer(thinking = True)
     try:
         api_client = await client.get_api_client(interaction)
@@ -221,6 +223,7 @@ async def add_alt_names(interaction: discord.Interaction, song_title: str, alt_t
         return 
     
     try:
+        alt_titles = [title.strip() for title in alt_titles.split(';') if title.strip() != ""]
         response = api_client.add_alt_names(target_title = song_title, 
                                             alt_names = alt_titles)
         output_str = ""
@@ -327,8 +330,9 @@ async def generate_playlist(interaction: discord.Interaction, playlist_title: st
     except httpx.ConnectError as e:
         await interaction.followup.send(f"Operation aborted. {e}")
         return 
-    song_titles = [title.strip() for title in song_titles.split(';') if title.strip() != ""]
+    
     try:
+        song_titles = [title.strip() for title in song_titles.split(';') if title.strip() != ""]
         response = api_client.generate_playlist(title = playlist_title,
                                                 privacy_status = privacy_status,
                                                 song_titles = song_titles)
@@ -354,6 +358,7 @@ async def summarize_playlists(interaction: discord.Interaction, mode: Literal['a
     except httpx.ConnectError as e:
         await interaction.followup.send(f"Operation aborted. {e}")
         return 
+    
     try:
         response = api_client.summarize_playlists(latest_only = (mode == 'recent'))
         await interaction.followup.send(response['detail'],
@@ -376,6 +381,7 @@ async def edit_playlist_title(interaction: discord.Interaction, old_title: str, 
         return 
     
     try:
+        new_title = new_title.strip()
         response = api_client.edit_playlist_title(old_title, new_title)
         await interaction.followup.send(response['detail'])
     except Exception as e:

@@ -13,3 +13,5 @@ demo.ipynb
 model/
 
 db_scripts/
+
+docker-compose*
