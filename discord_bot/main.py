@@ -131,7 +131,6 @@ async def summarize_songs(interaction: discord.Interaction, starts_with: str = N
 
     except Exception as e:
         await interaction.followup.send(f"Unexpected error occurred. {e}")
-        return
 
 @client.tree.command(name = 'add-song', description = 'Add song to the database.', guild = GUILD_ID)
 async def create_song(interaction: discord.Interaction, title: str, 
@@ -160,9 +159,9 @@ async def create_song(interaction: discord.Interaction, title: str,
                 output_str += f"{item} \n"
             else:
                 output_str += f"- {item} \n"
-    except:
-        output_str = 'Unexpected error occurred while interacting with the main API!'
-    await interaction.followup.send(output_str)
+        await interaction.followup.send(output_str)
+    except Exception as e:
+        await interaction.followup.send(f"Unexpected error occurred. {e}")
 
 @client.tree.command(name = 'edit-song-title', description = 'Edit the canonical title of a song.', guild = GUILD_ID)
 async def modify_title(interaction: discord.Interaction, old_title: str, new_title: str):
@@ -180,9 +179,9 @@ async def modify_title(interaction: discord.Interaction, old_title: str, new_tit
     
     try:
         response = api_client.modify_title(old_title, new_title)
-    except:
-        response = {'detail': 'Unexpected error occurred while interacting with the main API!'}
-    await interaction.followup.send(response['detail'])
+        await interaction.followup.send(response['detail'])
+    except Exception as e:
+        await interaction.followup.send(f"Unexpected error occurred. {e}")
 
 @client.tree.command(name = 'delete-song', 
                      description = 'Remove a song (along with its associated video and alt titles) from the database.',
@@ -201,10 +200,9 @@ async def delete_song(interaction: discord.Interaction, title: str):
 
     try:
         response = api_client.delete_song(title)
-        output_str = response['detail']
-    except:
-        output_str = 'Unexpected error occurred while interacting with the main API!'
-    await interaction.followup.send(output_str)
+        await interaction.followup.send(response['detail'])
+    except Exception as e:
+        await interaction.followup.send(f"Unexpected error occurred. {e}")
 
 @client.tree.command(name = 'add-alt-titles', description = 'Add alternate titles for to a song resource.', guild = GUILD_ID)
 async def add_alt_names(interaction: discord.Interaction, song_title: str, alt_titles: str):
@@ -228,9 +226,9 @@ async def add_alt_names(interaction: discord.Interaction, song_title: str, alt_t
         output_str = ""
         for item in response['detail']:
             output_str += f"- {item} \n"
-    except:
-        output_str = 'Unexpected error occurred while interacting with the main API!'
-    await interaction.followup.send(output_str)
+        await interaction.followup.send(output_str)
+    except Exception as e:
+        await interaction.followup.send(f"Unexpected error occurred. {e}")
 
 @client.tree.command(name = 'delete-alt-title', description = 'Delete specified alternate titles.', guild = GUILD_ID)
 async def delete_alt_names(interaction: discord.Interaction, alt_title: str):
@@ -247,10 +245,9 @@ async def delete_alt_names(interaction: discord.Interaction, alt_title: str):
     
     try:
         response = api_client.delete_alt_name(alt_name = alt_title)
+        await interaction.followup.send(response['detail'])
     except Exception as e:
-        response = {'detail': 'Unexpected error occurred while interacting with the main API!'}
-        print(e)
-    await interaction.followup.send(response['detail'])
+        await interaction.followup.send(f"Unexpected error occurred. {e}")
 
 @client.tree.command(name = 'merge-songs', 
                      description = 'Take all the alternate titles of second song and assigns them to first song.', 
@@ -271,9 +268,9 @@ async def merge_songs(interaction: discord.Interaction, priority_song: str, othe
     
     try:
         response = api_client.merge_songs(priority_song, other_song)
-    except:
-        response = {'detail': 'Unexpected error occurred while interacting with the main API!'}
-    await interaction.followup.send(response['detail'])
+        await interaction.followup.send(response['detail'])
+    except Exception as e:
+        await interaction.followup.send(f"Unexpected error occurred. {e}")
 
 @client.tree.command(name = 'splinter-song', description = 'Remove an alternate title of a song and create a new song resource from it.', guild = GUILD_ID)
 async def splinter_song(interaction: discord.Interaction, alt_title: str):
@@ -290,9 +287,9 @@ async def splinter_song(interaction: discord.Interaction, alt_title: str):
     
     try:
         response = api_client.splinter_song(target_song = alt_title)
-    except:
-        response = {'detail': 'Unexpected error occurred while interacting with the main API!'}
-    await interaction.followup.send(response['detail'])
+        await interaction.followup.send(response['detail'])
+    except Exception as e:
+        await interaction.followup.send(f"Unexpected error occurred. {e}")
 
 @client.tree.command(name = 'assign-video', description = 'Assigns a video to a song.', guild = GUILD_ID)
 async def assign_video(interaction: discord.Interaction, song_title: str, video_link: str):
@@ -310,13 +307,13 @@ async def assign_video(interaction: discord.Interaction, song_title: str, video_
     
     try:
         response = api_client.assign_video(song_title, video_link)
-    except:
-        response = {'detail': 'Unexpected error occurred while interacting with the main API!'}
-    await interaction.followup.send(response['detail'])
+        await interaction.followup.send(response['detail'])
+    except Exception as e:
+        await interaction.followup.send(f"Unexpected error occurred. {e}")
 
 # Playlist commands
 @client.tree.command(name = 'create-playlist', description = 'Create a playlist', guild = GUILD_ID)
-async def generate_playlist(interaction: discord.Interaction, playlist_title: str, song_titles: str, privacy_status: Literal['public', 'private', 'unlisted'] = 'private',):
+async def generate_playlist(interaction: discord.Interaction, playlist_title: str, song_titles: str, privacy_status: Literal['public', 'private', 'unlisted'] = 'unlisted',):
     """
     Args:
         playlist_title: The title assigned to the playlist.
@@ -341,9 +338,8 @@ async def generate_playlist(interaction: discord.Interaction, playlist_title: st
         for song, message in zip(song_titles, response['detail']):
             output_str += f"- {song}: {message} \n"
         await interaction.followup.send(output_str)
-    except:
-        response = {'detail': 'Unexpected error occurred while interacting with the main API!'}
-        await interaction.followup.send(response['detail'])
+    except Exception as e:
+        await interaction.followup.send(f"Unexpected error occurred. {e}")
     
 
 @client.tree.command(name = 'view-playlists', description = 'Get your playlists in database. You can fetch all playlists, or the most recent playlist.', guild = GUILD_ID)
@@ -360,11 +356,10 @@ async def summarize_playlists(interaction: discord.Interaction, mode: Literal['a
         return 
     try:
         response = api_client.summarize_playlists(latest_only = (mode == 'recent'))
-    except:
-        response = {'detail': 'Unexpected error occurred while interacting with the main API!'}
-    await interaction.followup.send(response['detail'],
-                                    suppress_embeds = (mode == 'all'))
-    
+        await interaction.followup.send(response['detail'],
+                                        suppress_embeds = (mode == 'all'))
+    except Exception as e:
+        await interaction.followup.send(f"Unexpected error occurred. {e}")
 
 @client.tree.command(name = 'edit-playlist', description = 'Edit the title of a playlist.', guild = GUILD_ID)
 async def edit_playlist_title(interaction: discord.Interaction, old_title: str, new_title: str):
@@ -382,9 +377,9 @@ async def edit_playlist_title(interaction: discord.Interaction, old_title: str, 
     
     try:
         response = api_client.edit_playlist_title(old_title, new_title)
-    except:
-        response = {'detail': 'Unexpected error occurred while interacting with the main API!'}
-    await interaction.followup.send(response['detail'])
+        await interaction.followup.send(response['detail'])
+    except Exception as e:
+        await interaction.followup.send(f"Unexpected error occurred. {e}")
 
 
 #Playlist item commands
@@ -406,9 +401,9 @@ async def add_to_playlist(interaction: discord.Interaction, playlist_title: str,
         response = api_client.add_to_playlist(playlist_title = playlist_title,
                                               video_link = video_link,
                                               record_in_db = True)
-    except:
-        response = {'detail': 'Unexpected error occurred while interacting with the main API!'}
-    await interaction.followup.send(response['detail'])
+        await interaction.followup.send(response['detail'])
+    except Exception as e:
+        await interaction.followup.send(f"Unexpected error occurred. {e}")
 
 @client.tree.command(name = 'replace-playlist-video', description = 'Replace a video in an existing playlist.', guild = GUILD_ID)
 async def replace_vid_in_playlist(interaction: discord.Interaction, playlist_title: str, position: int, video_link: str):
@@ -430,9 +425,9 @@ async def replace_vid_in_playlist(interaction: discord.Interaction, playlist_tit
         response = api_client.replace_vid_in_playlist(playlist_title = playlist_title,
                                                       pos = position - 1,
                                                       video_link = video_link)
-    except:
-        response = {'detail': 'Unexpected error occurred while interacting with the main API!'}
-    await interaction.followup.send(response['detail'])
+        await interaction.followup.send(response['detail'])
+    except Exception as e:
+        await interaction.followup.send(f"Unexpected error occurred. {e}")
     
 @client.tree.command(name = 'move-in-playlist', description = 'Move a video within existing playlist.', guild = GUILD_ID)
 async def move_vid_in_playlist(interaction: discord.Interaction, playlist_title: str, initial_position: int, final_position: int):
@@ -456,9 +451,9 @@ async def move_vid_in_playlist(interaction: discord.Interaction, playlist_title:
         response = api_client.move_vid_in_playlist(playlist_title = playlist_title,
                                                    init_pos = initial_position - 1,
                                                    target_pos = final_position - 1)
-    except:
-        response = {'detail': 'Unexpected error occurred while interacting with the main API!'}
-    await interaction.followup.send(response['detail'])
+        await interaction.followup.send(response['detail'])
+    except Exception as e:
+        await interaction.followup.send(f"Unexpected error occurred. {e}")
 
 @client.tree.command(name = 'remove-from-playlist', description = 'Remove a video from an existing playlist.', guild = GUILD_ID)
 async def remove_from_playlist(interaction: discord.Interaction, playlist_title: str, position: int):
@@ -478,10 +473,9 @@ async def remove_from_playlist(interaction: discord.Interaction, playlist_title:
         # subtract 1 from position because we use 0-indexing, while users use 1-indexing
         response = api_client.remove_from_playlist(playlist_title = playlist_title,
                                                    pos = position - 1)
+        await interaction.followup.send(response['detail'])
     except Exception as e:
-        print(e)
-        response = {'detail': 'Unexpected error occurred while interacting with the main API!'}
-    await interaction.followup.send(response['detail'])
+        await interaction.followup.send(f"Unexpected error occurred. {e}")
 
 # Import/export commands
 @client.tree.command(name = 'import-songs', description = 'Import songs from a .csv file and save into the database', guild = GUILD_ID)
