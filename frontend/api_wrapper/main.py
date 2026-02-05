@@ -33,33 +33,33 @@ class APIWrapper():
         self.playlists = Playlists(self.client)
         self.YT_API_KEY = YT_API_KEY
 
-    async def _check_yt_api_key(self):
+    def _check_yt_api_key(self):
         if self.YT_API_KEY is None:
             raise ValueError("Method requires a YouTube Data API key!")
 
-    async def set_yt_api_key(self, key: str):
+    def set_yt_api_key(self, key: str):
         self.YT_API_KEY = key
 
     # AUTH
-    async def login_status(self):
+    def login_status(self):
         try:
             response = self.authentication.get()
         except AuthenticationError:
             return {'status': False}
         return {'status': True}
 
-    async def login(self, username: str, password: str):
+    def login(self, username: str, password: str):
         # raises 403 if user doesn't exist or bad credentials
         response = self.authentication.post(username, password)
         self.client.headers["authorization"] = f"Bearer {response.json()['access_token']}"     
         return {'detail': 'Successfully logged in'}
 
-    async def create_user(self, username: str, password: str):
+    def create_user(self, username: str, password: str):
         response = self.users.post(username, password)
         return {'detail': 'User successfully created'}
 
     # READ
-    async def get_all_songs(self, starts_with: str = None):
+    def get_all_songs(self, starts_with: str = None):
         if starts_with is not None:
             if type(starts_with) != str:
                 raise ValueError('starts_with must be a string of length 1')
@@ -70,19 +70,19 @@ class APIWrapper():
         except NotFoundError:
             return []
 
-    async def get_all_playlists(self):
+    def get_all_playlists(self):
         try:
             return self.playlists.get().json()
         except NotFoundError:
             return []
 
-    async def get_latest_playlist(self):
+    def get_latest_playlist(self):
         try:
             return self.playlists.get_latest().json()
         except NotFoundError:
             return None
 
-    async def summarize_songs(self, starts_with: str = None,
+    def summarize_songs(self, starts_with: str = None,
                         include_alts: bool = True,
                         include_links: bool = True, 
                         print_result: bool = False):
@@ -113,7 +113,7 @@ class APIWrapper():
         else:
             return {"detail": output_str}
             
-    async def summarize_playlists(self, latest_only: bool = True, print_result: bool = False):
+    def summarize_playlists(self, latest_only: bool = True, print_result: bool = False):
         all_playlists = None
         if latest_only:
             all_playlists = self.get_latest_playlist()
@@ -142,25 +142,25 @@ class APIWrapper():
 
 
     # SEARCH
-    async def _db_search_song(self, song_title: str):
+    def _db_search_song(self, song_title: str):
         # searches songs by alt names, returns full song resource
         return self.songs.get(query_str = song_title).json()[0]
 
-    async def _db_search_alt(self, alt_title: str):
+    def _db_search_alt(self, alt_title: str):
         # searches alt_names table, returns alt_name resource
         return self.alt_names.get(query_str = alt_title).json()[0]
 
-    async def _db_search_playlist(self, playlist_title: str):
+    def _db_search_playlist(self, playlist_title: str):
         return self.playlists.get(query_str = playlist_title).json()[0]
 
-    async def _yt_search_video(self, query_str: str):
+    def _yt_search_video(self, query_str: str):
         # Search with YT Data API. Throw error if no YT_API_KEY 
         self._check_yt_api_key()
         new_video = utils.search_video(query_str, self.YT_API_KEY) 
         return new_video
 
     # AGGREGATES
-    async def smart_search_video(self, song_title: str, 
+    def smart_search_video(self, song_title: str, 
                           insert_song_if_na: bool = False,
                           insert_video_if_na: bool = False): 
         """
@@ -245,7 +245,7 @@ class APIWrapper():
 
         return response
     
-    async def create_song(self, title: str, alt_names: Optional[List[str]] = None, 
+    def create_song(self, title: str, alt_names: Optional[List[str]] = None, 
                     video_link: str = None,
                     video_id: str = None, video_title: str = None, channel_name: str = None):
         final_response = {'detail': []}
@@ -299,7 +299,7 @@ class APIWrapper():
         
         return final_response
 
-    async def import_songs(self, raw_df: pd.DataFrame):
+    def import_songs(self, raw_df: pd.DataFrame):
         self._check_yt_api_key()
         grouped_df = utils.process_songs_df(raw_df, self.YT_API_KEY)
         for i in range(len(grouped_df)):
@@ -308,7 +308,7 @@ class APIWrapper():
         return {'detail': 'Successfully imported songs!'}
 
     # PLAYLIST OPERATIONS
-    async def edit_playlist_title(self, old_title: str, new_title: str):
+    def edit_playlist_title(self, old_title: str, new_title: str):
         try:
             playlist = self._db_search_playlist(old_title)
         except NotFoundError:
@@ -321,7 +321,7 @@ class APIWrapper():
         except:
             return {"detail": f"Abandoned operation. Unexpected error while calling YouTube Data API"}
             
-    async def add_to_playlist(self, playlist_title: str, video_link: str, record_in_db: bool = False):
+    def add_to_playlist(self, playlist_title: str, video_link: str, record_in_db: bool = False):
         self._check_yt_api_key()
         # fetch playlist id by searching db by name
         try:
@@ -365,7 +365,7 @@ class APIWrapper():
                                  channel_name = video['channel_name'])
         return {"detail": "Successfully added video!"}
 
-    async def replace_vid_in_playlist(self, playlist_title: str, pos: int, video_link: str, record_in_db: bool = False):
+    def replace_vid_in_playlist(self, playlist_title: str, pos: int, video_link: str, record_in_db: bool = False):
         self._check_yt_api_key()
         # fetch playlist id by searching db by name
         try:
@@ -414,7 +414,7 @@ class APIWrapper():
                                  channel_name = video['channel_name'])
         return {"detail": "Successfully replaced video!"}
         
-    async def move_vid_in_playlist(self, playlist_title: str, init_pos: int, target_pos: int):
+    def move_vid_in_playlist(self, playlist_title: str, init_pos: int, target_pos: int):
         try:
             playlist = self._db_search_playlist(playlist_title)
         except NotFoundError:
@@ -433,7 +433,7 @@ class APIWrapper():
         
         return {"detail": "Successfully edited playlist!"}
 
-    async def remove_from_playlist(self, playlist_title: str, pos: int):
+    def remove_from_playlist(self, playlist_title: str, pos: int):
         try:
             playlist = self._db_search_playlist(playlist_title)
         except NotFoundError:
@@ -450,7 +450,7 @@ class APIWrapper():
         return {"detail": "Successfuly removed video from playlist!"}
 
     # SONG MANAGEMENT
-    async def merge_songs(self, priority_song: str, other_song: str):
+    def merge_songs(self, priority_song: str, other_song: str):
         song1, song2 = None, None
         try:
             song1 = self._db_search_song(priority_song)
@@ -464,7 +464,7 @@ class APIWrapper():
         self.songs.merge([song2['id']], song1['id'])
         return {"detail": "Songs successfully merged!"}
         
-    async def splinter_song(self, target_song: str):
+    def splinter_song(self, target_song: str):
         try:
             alt_name = self.alt_names.get(query_str = target_song).json()[0]
         except NotFoundError:
@@ -476,7 +476,7 @@ class APIWrapper():
         except ConflictError as e:
             return {"detail": f"Splinter failed. {e}"}
 
-    async def delete_song(self, title: str):
+    def delete_song(self, title: str):
         try:
             song = self._db_search_song(title)
             self.songs.delete(song['id'])
@@ -484,7 +484,7 @@ class APIWrapper():
             return {"detail": f"Song '{title}' not found!"}
         return {"detail": "Successfully deleted song!"}
 
-    async def add_alt_names(self, target_title: str, alt_names: List[str]):
+    def add_alt_names(self, target_title: str, alt_names: List[str]):
         response = {'detail': []}
         song = None
         try:
@@ -502,7 +502,7 @@ class APIWrapper():
         
         return response
 
-    async def delete_alt_name(self, alt_name: str):
+    def delete_alt_name(self, alt_name: str):
         try:
             target = self.alt_names.get(query_str = alt_name).json()[0]
             self.alt_names.delete(target['id'])
@@ -513,7 +513,7 @@ class APIWrapper():
             
         return {"detail": f"Successfully deleted the title {alt_name}!"}
 
-    async def modify_title(self, old_title: str, new_title: str):
+    def modify_title(self, old_title: str, new_title: str):
         try:
             song = self._db_search_song(old_title)
         except NotFoundError:
@@ -528,7 +528,7 @@ class APIWrapper():
         
         return {"detail": "Successfully updated song title!"}
   
-    async def assign_video(self, song_title: str, video_link: str):
+    def assign_video(self, song_title: str, video_link: str):
         try:
             song = self._db_search_song(song_title)          # raises NotFoundError if song not found
             video_id = utils.extract_video_id(video_link)   # raises VideoLinkParserError if can't find video_id

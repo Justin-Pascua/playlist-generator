@@ -31,12 +31,12 @@ class Authentication(Endpoint):
         super().__init__(client)
         self.url = self.base_url + '/authentication'
 
-    async def get(self):
+    def get(self):
         response = self.client.get(self.url)
         self._check_common_exceptions(response)
         return response
 
-    async def post(self, username: str, password: str):
+    def post(self, username: str, password: str):
         response = self.client.post(self.url,
                                     data = {'username': username,
                                             'password': password})
@@ -54,7 +54,7 @@ class Users(Endpoint):
         super().__init__(client)
         self.url = self.base_url + '/users'
 
-    async def post(self, username: str, password: str):
+    def post(self, username: str, password: str):
         response = self.client.post(self.url,
                                     json = {'username': username,
                                             'password': password})
@@ -70,7 +70,7 @@ class AltNames(Endpoint):
         super().__init__(client)
         self.url = self.base_url + '/alt-names'
 
-    async def post(self, title: str, canonical_id: int):
+    def post(self, title: str, canonical_id: int):
         response = self.client.post(self.url,
                                     json = {'title': title,
                                             'canonical_id': canonical_id})
@@ -89,7 +89,7 @@ class AltNames(Endpoint):
 
         return response
 
-    async def get(self, id: int = None, canonical_id: int = None, query_str: str = None):
+    def get(self, id: int = None, canonical_id: int = None, query_str: str = None):
         url = self.url
         params = dict()
 
@@ -114,7 +114,7 @@ class AltNames(Endpoint):
 
         return response
 
-    async def patch(self, id: int, title: str | None = None, canonical_id: int | None = None):
+    def patch(self, id: int, title: str | None = None, canonical_id: int | None = None):
         response = self.client.patch(self.url + f'/{id}',
                                      json = {'title': title,
                                              'canonical_id': canonical_id})
@@ -131,7 +131,7 @@ class AltNames(Endpoint):
 
         return response
 
-    async def delete(self, id: int):
+    def delete(self, id: int):
         response = self.client.delete(self.url + f'/{id}')
         self._check_common_exceptions(response)
         if response.status_code == 404:
@@ -150,7 +150,7 @@ class Songs(Endpoint):
         super().__init__(client)
         self.url = self.base_url + '/songs'
 
-    async def post(self, title: str):
+    def post(self, title: str):
         response = self.client.post(self.url,
                                     json = {'title': title})
         self._check_common_exceptions(response)
@@ -160,7 +160,7 @@ class Songs(Endpoint):
 
         return response
 
-    async def get(self, id: int = None, query_str: str = None, starts_with: str = None):
+    def get(self, id: int = None, query_str: str = None, starts_with: str = None):
         response = None
         if id is not None:
             response = self.client.get(self.url + f'/{id}')
@@ -183,7 +183,7 @@ class Songs(Endpoint):
         
         return response
         
-    async def patch(self, id: int, title: str):
+    def patch(self, id: int, title: str):
         response = self.client.patch(self.url + f'/{id}',
                                      json = {'title': title})
         self._check_common_exceptions(response)
@@ -198,7 +198,7 @@ class Songs(Endpoint):
             raise AuthorizationError(response.json()['detail'])
         return response
 
-    async def delete(self, id: int):
+    def delete(self, id: int):
         response = self.client.delete(self.url + f'/{id}')
         self._check_common_exceptions(response)
         if response.status_code == 404:
@@ -209,7 +209,7 @@ class Songs(Endpoint):
             raise AuthorizationError(response.json()['detail'])
         return response
 
-    async def splinter(self, alt_name_id: int):
+    def splinter(self, alt_name_id: int):
         response = self.client.post(self.url + '/splinters',
                                     json = {'alt_name_id': alt_name_id})
         self._check_common_exceptions(response)
@@ -224,7 +224,7 @@ class Songs(Endpoint):
             raise ConflictError(f"{response.json()['detail']}")
         return response
 
-    async def merge(self, canonical_ids: List[int], priority_id: int):
+    def merge(self, canonical_ids: List[int], priority_id: int):
         response = self.client.post(self.url + '/merges',
                                     json = {'canonical_ids': canonical_ids,
                                             'priority_id': priority_id})
@@ -246,7 +246,7 @@ class Songs(Endpoint):
             raise AuthorizationError(response.json()['detail'])
         return response
 
-    async def put_video(self, id: int, video_id: str, video_title: str, channel_name: str):
+    def put_video(self, id: int, video_id: str, video_title: str, channel_name: str):
         response = self.client.put(self.url + f'/{id}' + '/videos',
                                    json = {'id': video_id,
                                            'video_title': video_title,
@@ -258,7 +258,7 @@ class Songs(Endpoint):
             raise AuthorizationError(response.json()['detail'])
         return response
 
-    async def get_video(self, id: int):
+    def get_video(self, id: int):
         response = self.client.get(self.url + f'/{id}' + '/videos')
         self._check_common_exceptions(response)
         if response.status_code == 404:
@@ -267,7 +267,7 @@ class Songs(Endpoint):
             raise AuthorizationError(response.json()['detail'])
         return response
 
-    async def delete_video(self, id: int):
+    def delete_video(self, id: int):
         response = self.client.delete(self.url + f'/{id}' + '/videos')
         self._check_common_exceptions(response)
         if response.status_code == 404:
@@ -281,7 +281,7 @@ class Playlists(Endpoint):
         super().__init__(client)
         self.url = self.base_url + '/playlists'
 
-    async def post(self, title: str, privacy_status: str):
+    def post(self, title: str, privacy_status: str):
         
         response = self.client.post(self.url,
                                     json = {'title': title,
@@ -289,7 +289,7 @@ class Playlists(Endpoint):
         self._check_common_exceptions(response)
         return response
 
-    async def get(self, id: str = None, query_str: str = None):
+    def get(self, id: str = None, query_str: str = None):
         url = self.url
         params = dict()
         if id is not None:
@@ -308,7 +308,7 @@ class Playlists(Endpoint):
             raise AuthorizationError(response.json()['detail'])
         return response
 
-    async def get_latest(self):
+    def get_latest(self):
         response = self.client.get(self.url + '/latest')
         self._check_common_exceptions(response)
         if response.status_code == 404:
@@ -317,7 +317,7 @@ class Playlists(Endpoint):
             raise AuthorizationError(response.json()['detail'])
         return response
 
-    async def patch(self, id: str, title: str | None = None, privacy_status: str | None = None):
+    def patch(self, id: str, title: str | None = None, privacy_status: str | None = None):
         if title is None and privacy_status is None:
             return
         response = self.client.patch(self.url + f'/{id}',
@@ -330,7 +330,7 @@ class Playlists(Endpoint):
             raise AuthorizationError(response.json()['detail'])
         return response
 
-    async def delete(self, id: str):
+    def delete(self, id: str):
         response = self.client.delete(self.url + f'/{id}')
         self._check_common_exceptions(response)
         if response.status_code == 404:
@@ -339,7 +339,7 @@ class Playlists(Endpoint):
             raise AuthorizationError(response.json()['detail'])
         return response
 
-    async def get_items(self, id: str):
+    def get_items(self, id: str):
         response = self.client.get(self.url + f'/{id}' + '/items')
         self._check_common_exceptions(response)
         if response.status_code == 404:
@@ -348,7 +348,7 @@ class Playlists(Endpoint):
             raise AuthorizationError(response.json()['detail'])
         return response
 
-    async def post_item(self, id: str, video_id: str, pos: int | None = None):
+    def post_item(self, id: str, video_id: str, pos: int | None = None):
         response = self.client.post(self.url + f'/{id}' + '/items',
                                     json = {'video_id': video_id,
                                             'pos': pos})
@@ -359,7 +359,7 @@ class Playlists(Endpoint):
             raise AuthorizationError(response.json()['detail'])
         return response
 
-    async def patch_item(self, id: str, mode: Literal["Replace", "Move"], sub_details: dict):
+    def patch_item(self, id: str, mode: Literal["Replace", "Move"], sub_details: dict):
         """
         Calls patch method at /playlist/{id}/ route. This is used to replace a video within a playlist
         or adjust its position.
@@ -382,7 +382,7 @@ class Playlists(Endpoint):
             raise ValueError(response.json()['detail'])
         return response
 
-    async def delete_item(self, id: str, pos: int):
+    def delete_item(self, id: str, pos: int):
         # need to use .request() because .delete() doesn't accept a request body
         response = self.client.request(method = "DELETE",
                                        url = self.url + f'/{id}' + '/items',

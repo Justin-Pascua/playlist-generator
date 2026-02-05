@@ -114,8 +114,8 @@ async def summarize_songs(interaction: discord.Interaction, starts_with: str = N
 
     try:
         response = api_client.summarize_songs(starts_with = starts_with, 
-                                              include_alts = include_alts,
-                                              include_links = include_links)
+                                                    include_alts = include_alts,
+                                                    include_links = include_links)
         output_str = response['detail']
         if len(output_str) < 2000:
             await interaction.followup.send(output_str,
@@ -333,7 +333,7 @@ async def generate_playlist(interaction: discord.Interaction, playlist_title: st
     
     try:
         song_titles = [title.strip() for title in song_titles.split(';') if title.strip() != ""]
-        response = api_client.generate_playlist(title = playlist_title,
+        response = await api_client.generate_playlist(title = playlist_title,
                                                 privacy_status = privacy_status,
                                                 song_titles = song_titles)
         output_str = f"Title: {response['content']['playlist_title']} \n"
