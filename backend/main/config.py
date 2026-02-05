@@ -3,8 +3,7 @@ from pydantic import SecretStr
 
 class Settings(BaseSettings):
     YT_API_KEY: SecretStr
-    
-    MYSQL_PROTOCOL: SecretStr
+
     MYSQL_HOST: SecretStr
     MYSQL_USER: SecretStr
     MYSQL_PORT: int
