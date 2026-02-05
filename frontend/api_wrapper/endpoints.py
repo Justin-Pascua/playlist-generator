@@ -2,10 +2,11 @@ import httpx
 import warnings
 from typing import List, Optional, Literal
 
+from .config import settings
 from .exceptions import (AuthenticationError, AuthorizationError, NotFoundError, 
                          ConflictError, VideoLinkParserError, PartialOperationWarning)
 
-BASE_URL = "http://localhost:8000"
+BASE_URL = settings.BASE_URL
 
 class Endpoint():
     def __init__(self, client, url = BASE_URL):
