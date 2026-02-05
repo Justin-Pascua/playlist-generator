@@ -3,13 +3,25 @@ import warnings
 from typing import List, Optional
 import pandas as pd
 
-from .endpoints import Endpoint, Authentication, Users, AltNames, Songs, Playlists
+from .endpoints import BASE_URL, Endpoint, Authentication, Users, AltNames, Songs, Playlists
 from .exceptions import (AuthenticationError, AuthorizationError, NotFoundError, 
                          ConflictError, VideoLinkParserError, PartialOperationWarning)
 from . import utils
 
 
-TAB_STR = " "*4
+def ping():
+    """
+    Ping API to check health. If the API responds with 200, then this function returns True. Otherwise, it returns False
+    """
+    try:
+        response = httpx.get(BASE_URL)
+        if response.status_code == 200:
+            return True
+        else:
+            return False
+    except:
+        return False
+
 class APIWrapper():
     def __init__(self, YT_API_KEY: str = None):
         self.client = httpx.Client(follow_redirects = True,

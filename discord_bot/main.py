@@ -1,18 +1,16 @@
 import discord
 from discord.ext import commands
-from discord import app_commands
 
 import pandas as pd
 
 import io
-import asyncio
-from typing import Optional, List, Literal
+from typing import Optional, Literal
 import datetime as dt
-import time
+import httpx
 
 from .config import settings
 from . import utils
-from api_wrapper.main import APIWrapper
+from api_wrapper.main import APIWrapper, ping
 
 
 # from api_wrapper.main import APIWrapper
@@ -40,7 +38,6 @@ class Client(commands.Bot):
             print(f'Synced {len(synced)} commands to {guild.id}')
         except Exception as e:
             print(f'Error syncing commands: {e}')
-        
 
     async def get_api_client(self, interaction: discord.Interaction) -> APIWrapper:
         """
@@ -48,6 +45,10 @@ class Client(commands.Bot):
         If the client exists, then it is fetched from `self.api_clients` and its JWT is refreshed.
         If the client doesn't exist, then one is created by either logging in or by creating a user. In either case, it will be added to `self.api_clients`
         """
+        # verify that API is up
+        if not ping():
+            raise httpx.ConnectError("Main API is down!")
+        
         # try getting from existing clients
         try:
             current_client: APIWrapper = self.api_clients[interaction.guild_id]
@@ -76,7 +77,17 @@ intents.message_content = True
 
 client = Client(command_prefix = "/", intents = intents)
 
-# 'SONGS' COMMANDS
+# General commands
+@client.tree.command(name = 'help', description = 'Get general info about this bot', guild = GUILD_ID)
+async def help(interaction: discord.Interaction):
+    output_str = "This bot helps teams by automating the process of creating YouTube playlists. " \
+    "It records which songs and which videos your team uses in order to better match your " \
+    "preferences. Users can add, edit, delete, merge, and split songs. For a comprehensive explanation " \
+    "of all the commands, and how the bot works, please refer to [LINK HERE]"
+    
+    await interaction.response.send_message(output_str)
+
+# Song commands
 @client.tree.command(name = 'view-songs', description = 'Get all your songs in the database.', guild = GUILD_ID)
 async def summarize_songs(interaction: discord.Interaction, starts_with: str = None, 
                           include_alts: Optional[bool] = True, include_links: Optional[bool] = True):
@@ -95,7 +106,12 @@ async def summarize_songs(interaction: discord.Interaction, starts_with: str = N
             return
         
     await interaction.response.defer(thinking = True)
-    api_client = await client.get_api_client(interaction)
+    try:
+        api_client = await client.get_api_client(interaction)
+    except httpx.ConnectError as e:
+        await interaction.followup.send(f"Operation aborted. {e}")
+        return 
+
     try:
         response = api_client.summarize_songs(starts_with = starts_with, 
                                               include_alts = include_alts,
@@ -113,9 +129,8 @@ async def summarize_songs(interaction: discord.Interaction, starts_with: str = N
                 suppress_embeds = True
             )
 
-
     except Exception as e:
-        await interaction.followup.send(f"Unexpected error occurred. {str(e)}")
+        await interaction.followup.send(f"Unexpected error occurred. {e}")
         return
 
 @client.tree.command(name = 'add-song', description = 'Add song to the database.', guild = GUILD_ID)
@@ -131,7 +146,12 @@ async def create_song(interaction: discord.Interaction, title: str,
         alt_titles = [title.strip() for title in alt_titles.split(';') if title.strip() != ""]
     
     await interaction.response.defer(thinking = True)
-    api_client = await client.get_api_client(interaction)
+    try:
+        api_client = await client.get_api_client(interaction)
+    except httpx.ConnectError as e:
+        await interaction.followup.send(f"Operation aborted. {e}")
+        return 
+    
     try:
         response = api_client.create_song(title = title, alt_names = alt_titles, video_link = video_link)
         output_str = ""
@@ -152,7 +172,12 @@ async def modify_title(interaction: discord.Interaction, old_title: str, new_tit
         new_title: The new title to be assigned. 
     """
     await interaction.response.defer(thinking = True)
-    api_client = await client.get_api_client(interaction)
+    try:
+        api_client = await client.get_api_client(interaction)
+    except httpx.ConnectError as e:
+        await interaction.followup.send(f"Operation aborted. {e}")
+        return 
+    
     try:
         response = api_client.modify_title(old_title, new_title)
     except:
@@ -169,7 +194,12 @@ async def add_alt_names(interaction: discord.Interaction, song_title: str, alt_t
     
     alt_titles = [title.strip() for title in alt_titles.split(';') if title.strip() != ""]
     await interaction.response.defer(thinking = True)
-    api_client = await client.get_api_client(interaction)
+    try:
+        api_client = await client.get_api_client(interaction)
+    except httpx.ConnectError as e:
+        await interaction.followup.send(f"Operation aborted. {e}")
+        return 
+    
     try:
         response = api_client.add_alt_names(target_title = song_title, 
                                             alt_names = alt_titles)
@@ -187,7 +217,12 @@ async def delete_alt_names(interaction: discord.Interaction, alt_title: str):
         alt_titles: The title to be deleted.
     """
     await interaction.response.defer(thinking = True)
-    api_client = await client.get_api_client(interaction)
+    try:
+        api_client = await client.get_api_client(interaction)
+    except httpx.ConnectError as e:
+        await interaction.followup.send(f"Operation aborted. {e}")
+        return 
+    
     try:
         response = api_client.delete_alt_name(alt_name = alt_title)
     except Exception as e:
@@ -206,7 +241,12 @@ async def merge_songs(interaction: discord.Interaction, priority_song: str, othe
             Note that if this song has been assigned a video, then it will be discarded after merging.
     """
     await interaction.response.defer(thinking = True)
-    api_client = await client.get_api_client(interaction)
+    try:
+        api_client = await client.get_api_client(interaction)
+    except httpx.ConnectError as e:
+        await interaction.followup.send(f"Operation aborted. {e}")
+        return 
+    
     try:
         response = api_client.merge_songs(priority_song, other_song)
     except:
@@ -220,7 +260,12 @@ async def splinter_song(interaction: discord.Interaction, alt_title: str):
         alt_title: The alternate title that will be splintered off of its song.
     """
     await interaction.response.defer(thinking = True)
-    api_client = await client.get_api_client(interaction)
+    try:
+        api_client = await client.get_api_client(interaction)
+    except httpx.ConnectError as e:
+        await interaction.followup.send(f"Operation aborted. {e}")
+        return 
+    
     try:
         response = api_client.splinter_song(target_song = alt_title)
     except:
@@ -235,14 +280,19 @@ async def assign_video(interaction: discord.Interaction, song_title: str, video_
         video_link: A link to a YouTube video.
     """
     await interaction.response.defer(thinking = True)
-    api_client = await client.get_api_client(interaction)
+    try:
+        api_client = await client.get_api_client(interaction)
+    except httpx.ConnectError as e:
+        await interaction.followup.send(f"Operation aborted. {e}")
+        return 
+    
     try:
         response = api_client.assign_video(song_title, video_link)
     except:
         response = {'detail': 'Unexpected error occurred while interacting with the main API!'}
     await interaction.followup.send(response['detail'])
 
-# 'PLAYLISTS' COMMANDS
+# Playlist commands
 @client.tree.command(name = 'create-playlist', description = 'Create a playlist', guild = GUILD_ID)
 async def generate_playlist(interaction: discord.Interaction, playlist_title: str, song_titles: str, privacy_status: Literal['public', 'private', 'unlisted'] = 'private',):
     """
@@ -253,7 +303,11 @@ async def generate_playlist(interaction: discord.Interaction, playlist_title: st
         privacy_status: The privacy status of the playlist.
     """
     await interaction.response.defer(thinking = True)
-    api_client = await client.get_api_client(interaction)
+    try:
+        api_client = await client.get_api_client(interaction)
+    except httpx.ConnectError as e:
+        await interaction.followup.send(f"Operation aborted. {e}")
+        return 
     song_titles = [title.strip() for title in song_titles.split(';') if title.strip() != ""]
     try:
         response = api_client.generate_playlist(title = playlist_title,
@@ -277,7 +331,11 @@ async def summarize_playlists(interaction: discord.Interaction, mode: Literal['a
         mode: Type "all" to get all playlists you've created, or "recent" to get the most recent playlist.
     """
     await interaction.response.defer(thinking = True)
-    api_client = await client.get_api_client(interaction)
+    try:
+        api_client = await client.get_api_client(interaction)
+    except httpx.ConnectError as e:
+        await interaction.followup.send(f"Operation aborted. {e}")
+        return 
     try:
         response = api_client.summarize_playlists(latest_only = (mode == 'recent'))
     except:
@@ -294,7 +352,12 @@ async def edit_playlist_title(interaction: discord.Interaction, old_title: str, 
         new_title: The new title to be assigned to the playlist.
     """
     await interaction.response.defer(thinking = True)
-    api_client = await client.get_api_client(interaction)
+    try:
+        api_client = await client.get_api_client(interaction)
+    except httpx.ConnectError as e:
+        await interaction.followup.send(f"Operation aborted. {e}")
+        return 
+    
     try:
         response = api_client.edit_playlist_title(old_title, new_title)
     except:
@@ -302,7 +365,7 @@ async def edit_playlist_title(interaction: discord.Interaction, old_title: str, 
     await interaction.followup.send(response['detail'])
 
 
-# 'PLAYLIST-ITEMS' COMMANDS
+#Playlist item commands
 @client.tree.command(name = 'add-to-playlist', description = 'Add a video to an existing playlist.', guild = GUILD_ID)
 async def add_to_playlist(interaction: discord.Interaction, playlist_title: str, video_link: str):
     """
@@ -311,7 +374,12 @@ async def add_to_playlist(interaction: discord.Interaction, playlist_title: str,
         video_link: The link of the video to be added.
     """
     await interaction.response.defer(thinking = True)
-    api_client = await client.get_api_client(interaction)
+    try:
+        api_client = await client.get_api_client(interaction)
+    except httpx.ConnectError as e:
+        await interaction.followup.send(f"Operation aborted. {e}")
+        return 
+    
     try:
         response = api_client.add_to_playlist(playlist_title = playlist_title,
                                               video_link = video_link,
@@ -329,7 +397,12 @@ async def replace_vid_in_playlist(interaction: discord.Interaction, playlist_tit
         video_link: The link of the video to be added.
     """
     await interaction.response.defer(thinking = True)
-    api_client = await client.get_api_client(interaction)
+    try:
+        api_client = await client.get_api_client(interaction)
+    except httpx.ConnectError as e:
+        await interaction.followup.send(f"Operation aborted. {e}")
+        return 
+    
     try:
         # subtract 1 from position because we use 0-indexing, while users use 1-indexing
         response = api_client.replace_vid_in_playlist(playlist_title = playlist_title,
@@ -350,7 +423,12 @@ async def move_vid_in_playlist(interaction: discord.Interaction, playlist_title:
             (e.g. if you want to move the video to be the third in the playlist, set this to 3).
     """
     await interaction.response.defer(thinking = True)
-    api_client = await client.get_api_client(interaction)
+    try:
+        api_client = await client.get_api_client(interaction)
+    except httpx.ConnectError as e:
+        await interaction.followup.send(f"Operation aborted. {e}")
+        return 
+    
     try:
         # subtract 1 from position because we use 0-indexing, while users use 1-indexing
         response = api_client.move_vid_in_playlist(playlist_title = playlist_title,
@@ -368,7 +446,12 @@ async def remove_from_playlist(interaction: discord.Interaction, playlist_title:
         position: The position of the video that should be removed (e.g. if you want to remove the second video, then enter 2). 
     """
     await interaction.response.defer(thinking = True)
-    api_client = await client.get_api_client(interaction)
+    try:
+        api_client = await client.get_api_client(interaction)
+    except httpx.ConnectError as e:
+        await interaction.followup.send(f"Operation aborted. {e}")
+        return 
+    
     try:
         # subtract 1 from position because we use 0-indexing, while users use 1-indexing
         response = api_client.remove_from_playlist(playlist_title = playlist_title,
@@ -378,6 +461,7 @@ async def remove_from_playlist(interaction: discord.Interaction, playlist_title:
         response = {'detail': 'Unexpected error occurred while interacting with the main API!'}
     await interaction.followup.send(response['detail'])
 
+# Import/export commands
 @client.tree.command(name = 'import-songs', description = 'Import songs from a .csv file and save into the database', guild = GUILD_ID)
 async def import_csv(interaction: discord.Interaction, file: discord.Attachment):
     """
@@ -386,16 +470,24 @@ async def import_csv(interaction: discord.Interaction, file: discord.Attachment)
             For a formatting guide, see https://docs.google.com/spreadsheets/d/1nRShEulUUMzuYSU3Ju_UkTgAW-cJqx7gKBS5VXy8hdE/edit?usp=sharing
     """
     await interaction.response.defer(thinking = True)
-    api_client = await client.get_api_client(interaction)
+    try:
+        api_client = await client.get_api_client(interaction)
+    except httpx.ConnectError as e:
+        await interaction.followup.send(f"Operation aborted. {e}")
+        return 
+    
+    guide_link = 'https://docs.google.com/spreadsheets/d/1nRShEulUUMzuYSU3Ju_UkTgAW-cJqx7gKBS5VXy8hdE/edit?usp=sharing'
+    
     # verfiy file format
     if not file.filename.lower().endswith('.csv'):
-        await interaction.followup.send("❌ Please upload a .csv file")
+        await interaction.followup.send(f"Operation aborted. Please upload a .csv file! For a guide, please refer to {guide_link}")
         return
     
     status_msg = await interaction.followup.send("*Processing data. This might take a while :/*",
                                                  suppress_embeds = True)
-    guide_link = 'https://docs.google.com/spreadsheets/d/1nRShEulUUMzuYSU3Ju_UkTgAW-cJqx7gKBS5VXy8hdE/edit?usp=sharing'
+    
     try:
+        # read into df and check col names
         file_bytes = await file.read()
         df = pd.read_csv(io.BytesIO(file_bytes))
         if not all(df.columns == ['Song', 'Alt Names', 'Link']):
@@ -405,15 +497,21 @@ async def import_csv(interaction: discord.Interaction, file: discord.Attachment)
                 Please refer to the guide at {guide_link}"""
             )
             return
+        
         response = api_client.import_songs(df)
         await status_msg.edit(content = f"{response['detail']}")
     except Exception as e:
-        await status_msg.edit(content = f"Error:{type(e)} {e}")
+        await status_msg.edit(content = f"Unexpected error: {e}")
 
 @client.tree.command(name = 'export-songs', description = 'Export all songs in your database into a .csv file', guild = GUILD_ID)
 async def export_csv(interaction: discord.Interaction):
     await interaction.response.defer(thinking = True)
-    api_client = await client.get_api_client(interaction)
+    try:
+        api_client = await client.get_api_client(interaction)
+    except httpx.ConnectError as e:
+        await interaction.followup.send(f"Operation aborted. {e}")
+        return 
+    
     try:
         songs = api_client.get_all_songs()
         if len(songs) == 0:
@@ -432,6 +530,6 @@ async def export_csv(interaction: discord.Interaction):
             file = csv_file
         )
     except Exception as e:
-        await interaction.followup.send(content = f"Unexpected error occured: {str(e)}")
+        await interaction.followup.send(content = f"Unexpected error occured: {e}")
 
 client.run(TOKEN)
