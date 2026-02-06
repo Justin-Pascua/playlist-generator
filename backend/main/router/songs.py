@@ -57,7 +57,7 @@ async def get_all_songs(query_str: Optional[str] = None,
         .group_by(Canonical.id, Canonical.title, Video.link))
     
     if query_str is not None:
-        stmt = stmt.having(func.sum(AltName.title == query_str) > 0)
+        stmt = stmt.having(func.sum(AltName.title.like(f"%{query_str}%")) > 0)
     if starts_with is not None:
         stmt = stmt.having(Canonical.title.startswith(starts_with))
     stmt = stmt.order_by(Canonical.title)

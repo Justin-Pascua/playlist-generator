@@ -60,14 +60,14 @@ class APIWrapper():
         return {'detail': 'User successfully created'}
 
     # READ
-    async def get_all_songs(self, starts_with: str = None):
+    async def get_all_songs(self, starts_with: str = None, query_str: str = None):
         if starts_with is not None:
             if type(starts_with) != str:
                 raise ValueError('starts_with must be a string of length 1')
             if len(starts_with) > 1:
                 raise ValueError('starts_with must be a string of length 1')
         try:
-            response = await self.songs.get(starts_with = starts_with)
+            response = await self.songs.get(starts_with = starts_with, query_str = query_str)
             return response.json()
         except NotFoundError:
             return []
@@ -86,11 +86,11 @@ class APIWrapper():
         except NotFoundError:
             return None
 
-    async def summarize_songs(self, starts_with: str = None,
-                        include_alts: bool = True,
-                        include_links: bool = True, 
-                        print_result: bool = False):
-        all_songs = await self.get_all_songs(starts_with = starts_with)
+    async def summarize_songs(self, starts_with: str = None, query_str: str = None,
+                              include_alts: bool = True,
+                              include_links: bool = True, 
+                              print_result: bool = False):
+        all_songs = await self.get_all_songs(starts_with = starts_with, query_str = query_str)
 
         output_str = ""
         if len(all_songs) == 0:

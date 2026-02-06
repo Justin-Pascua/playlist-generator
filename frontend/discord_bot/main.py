@@ -108,10 +108,12 @@ async def help(interaction: discord.Interaction):
 
 # Song commands
 @client.tree.command(name = 'view-songs', description = 'Get all your songs in the database.', guild = GUILD_ID)
-async def summarize_songs(interaction: discord.Interaction, starts_with: str = None, 
+async def summarize_songs(interaction: discord.Interaction, 
+                          query_str: str = None, starts_with: str = None,
                           include_alts: Optional[bool] = True, include_links: Optional[bool] = True):
     """
     Args:
+        query_str: Used to search songs by their canonical title and/or alternate titles.
         starts_with: Type a single letter to get only songs starting with that letter.
         include_alts: Type "False" to exclude alternate names.
         include_links: Type "False" to exclude video links.
@@ -133,6 +135,7 @@ async def summarize_songs(interaction: discord.Interaction, starts_with: str = N
 
     try:
         response = await api_client.summarize_songs(
+            query_str = query_str,
             starts_with = starts_with, 
             include_alts = include_alts,
             include_links = include_links)
