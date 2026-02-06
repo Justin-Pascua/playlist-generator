@@ -11,7 +11,7 @@ BASE_URL = settings.BASE_URL
 class Endpoint():
     def __init__(self, client, url = BASE_URL):
         self.base_url = url
-        self.client: httpx.Client = client
+        self.client: httpx.AsyncClient = client
 
     def _check_common_exceptions(self, response):
         if response.status_code == 500:
@@ -32,21 +32,22 @@ class Authentication(Endpoint):
         super().__init__(client)
         self.url = self.base_url + '/authentication'
 
-    def get(self):
-        response = self.client.get(self.url)
+    async def get(self):
+        response = await self.client.get(self.url)
         self._check_common_exceptions(response)
         return response
 
-    def post(self, username: str, password: str):
-        response = self.client.post(self.url,
-                                    data = {'username': username,
-                                            'password': password})
+    async def post(self, username: str, password: str):
+        response = await self.client.post(
+            self.url,
+            data = {'username': username,
+                    'password': password})
         
         self._check_common_exceptions(response)
         
         if response.status_code == 403:
             # invalid credentials
-            raise ValueError(f"{response.json()['detail']}")
+            raise AuthenticationError(f"{response.json()['detail']}")
         
         return response
 
@@ -55,10 +56,11 @@ class Users(Endpoint):
         super().__init__(client)
         self.url = self.base_url + '/users'
 
-    def post(self, username: str, password: str):
-        response = self.client.post(self.url,
-                                    json = {'username': username,
-                                            'password': password})
+    async def post(self, username: str, password: str):
+        response = await self.client.post(
+            self.url,
+            json = {'username': username,
+                    'password': password})
         self._check_common_exceptions(response)
         if response.status_code == 409:
             # username taken
@@ -71,10 +73,11 @@ class AltNames(Endpoint):
         super().__init__(client)
         self.url = self.base_url + '/alt-names'
 
-    def post(self, title: str, canonical_id: int):
-        response = self.client.post(self.url,
-                                    json = {'title': title,
-                                            'canonical_id': canonical_id})
+    async def post(self, title: str, canonical_id: int):
+        response = await self.client.post(
+            self.url,
+            json = {'title': title,
+                    'canonical_id': canonical_id})
         
         self._check_common_exceptions(response)
 
@@ -90,7 +93,7 @@ class AltNames(Endpoint):
 
         return response
 
-    def get(self, id: int = None, canonical_id: int = None, query_str: str = None):
+    async def get(self, id: int = None, canonical_id: int = None, query_str: str = None):
         url = self.url
         params = dict()
 
@@ -102,8 +105,9 @@ class AltNames(Endpoint):
             if query_str is not None:
                 params['query_str'] = query_str
         
-        response = self.client.get(url,
-                                   params = params)
+        response = await self.client.get(
+            url,
+            params = params)
         
         self._check_common_exceptions(response)
         if response.status_code == 404:
@@ -115,10 +119,11 @@ class AltNames(Endpoint):
 
         return response
 
-    def patch(self, id: int, title: str | None = None, canonical_id: int | None = None):
-        response = self.client.patch(self.url + f'/{id}',
-                                     json = {'title': title,
-                                             'canonical_id': canonical_id})
+    async def patch(self, id: int, title: str | None = None, canonical_id: int | None = None):
+        response = await self.client.patch(
+            self.url + f'/{id}',
+            json = {'title': title,
+                    'canonical_id': canonical_id})
         self._check_common_exceptions(response)
         if response.status_code == 409:
             # alt name taken
@@ -132,8 +137,8 @@ class AltNames(Endpoint):
 
         return response
 
-    def delete(self, id: int):
-        response = self.client.delete(self.url + f'/{id}')
+    async def delete(self, id: int):
+        response = await self.client.delete(self.url + f'/{id}')
         self._check_common_exceptions(response)
         if response.status_code == 404:
             # alt name not found
@@ -151,9 +156,10 @@ class Songs(Endpoint):
         super().__init__(client)
         self.url = self.base_url + '/songs'
 
-    def post(self, title: str):
-        response = self.client.post(self.url,
-                                    json = {'title': title})
+    async def post(self, title: str):
+        response = await self.client.post(
+            self.url,
+            json = {'title': title})
         self._check_common_exceptions(response)
         if response.status_code == 409:
             # title taken
@@ -161,18 +167,19 @@ class Songs(Endpoint):
 
         return response
 
-    def get(self, id: int = None, query_str: str = None, starts_with: str = None):
+    async def get(self, id: int = None, query_str: str = None, starts_with: str = None):
         response = None
         if id is not None:
-            response = self.client.get(self.url + f'/{id}')
+            response = await self.client.get(self.url + f'/{id}')
         else:
             params = dict()
             if query_str is not None:
                 params['query_str'] = query_str
             if starts_with is not None:
                 params['starts_with'] = starts_with
-            response = self.client.get(self.url,
-                                       params = params)
+            response = await self.client.get(
+                self.url,
+                params = params)
         
         self._check_common_exceptions(response)
         if response.status_code == 404:
@@ -184,9 +191,10 @@ class Songs(Endpoint):
         
         return response
         
-    def patch(self, id: int, title: str):
-        response = self.client.patch(self.url + f'/{id}',
-                                     json = {'title': title})
+    async def patch(self, id: int, title: str):
+        response = await self.client.patch(
+            self.url + f'/{id}',
+            json = {'title': title})
         self._check_common_exceptions(response)
         if response.status_code == 409:
             # title taken
@@ -199,8 +207,8 @@ class Songs(Endpoint):
             raise AuthorizationError(response.json()['detail'])
         return response
 
-    def delete(self, id: int):
-        response = self.client.delete(self.url + f'/{id}')
+    async def delete(self, id: int):
+        response = await self.client.delete(self.url + f'/{id}')
         self._check_common_exceptions(response)
         if response.status_code == 404:
             # song not found
@@ -210,9 +218,10 @@ class Songs(Endpoint):
             raise AuthorizationError(response.json()['detail'])
         return response
 
-    def splinter(self, alt_name_id: int):
-        response = self.client.post(self.url + '/splinters',
-                                    json = {'alt_name_id': alt_name_id})
+    async def splinter(self, alt_name_id: int):
+        response = await self.client.post(
+            self.url + '/splinters',
+            json = {'alt_name_id': alt_name_id})
         self._check_common_exceptions(response)
         if response.status_code == 404:
             # alt name not found
@@ -225,10 +234,11 @@ class Songs(Endpoint):
             raise ConflictError(f"{response.json()['detail']}")
         return response
 
-    def merge(self, canonical_ids: List[int], priority_id: int):
-        response = self.client.post(self.url + '/merges',
-                                    json = {'canonical_ids': canonical_ids,
-                                            'priority_id': priority_id})
+    async def merge(self, canonical_ids: List[int], priority_id: int):
+        response = await self.client.post(
+            self.url + '/merges',
+            json = {'canonical_ids': canonical_ids,
+                    'priority_id': priority_id})
         # check 422 first because this route throws a different type of error message  
         if response.status_code == 422:
             try:
@@ -247,11 +257,12 @@ class Songs(Endpoint):
             raise AuthorizationError(response.json()['detail'])
         return response
 
-    def put_video(self, id: int, video_id: str, video_title: str, channel_name: str):
-        response = self.client.put(self.url + f'/{id}' + '/videos',
-                                   json = {'id': video_id,
-                                           'video_title': video_title,
-                                           'channel_name': channel_name})
+    async def put_video(self, id: int, video_id: str, video_title: str, channel_name: str):
+        response = await self.client.put(
+            self.url + f'/{id}' + '/videos',
+            json = {'id': video_id,
+                    'video_title': video_title,
+                    'channel_name': channel_name})
         self._check_common_exceptions(response)
         if response.status_code == 404:
             raise NotFoundError(response.json()['detail'])
@@ -259,8 +270,8 @@ class Songs(Endpoint):
             raise AuthorizationError(response.json()['detail'])
         return response
 
-    def get_video(self, id: int):
-        response = self.client.get(self.url + f'/{id}' + '/videos')
+    async def get_video(self, id: int):
+        response = await self.client.get(self.url + f'/{id}' + '/videos')
         self._check_common_exceptions(response)
         if response.status_code == 404:
             raise NotFoundError(response.json()['detail'])
@@ -268,8 +279,8 @@ class Songs(Endpoint):
             raise AuthorizationError(response.json()['detail'])
         return response
 
-    def delete_video(self, id: int):
-        response = self.client.delete(self.url + f'/{id}' + '/videos')
+    async def delete_video(self, id: int):
+        response = await self.client.delete(self.url + f'/{id}' + '/videos')
         self._check_common_exceptions(response)
         if response.status_code == 404:
             raise NotFoundError(response.json()['detail'])
@@ -282,15 +293,15 @@ class Playlists(Endpoint):
         super().__init__(client)
         self.url = self.base_url + '/playlists'
 
-    def post(self, title: str, privacy_status: str):
-        
-        response = self.client.post(self.url,
-                                    json = {'title': title,
-                                            'privacy_status': privacy_status})
+    async def post(self, title: str, privacy_status: str): 
+        response = await self.client.post(
+            self.url,
+            json = {'title': title,
+                    'privacy_status': privacy_status})
         self._check_common_exceptions(response)
         return response
 
-    def get(self, id: str = None, query_str: str = None):
+    async def get(self, id: str = None, query_str: str = None):
         url = self.url
         params = dict()
         if id is not None:
@@ -299,8 +310,9 @@ class Playlists(Endpoint):
             if query_str is not None:
                 params['query_str'] = query_str
 
-        response = self.client.get(url,
-                                   params = params)
+        response = await self.client.get(
+            url,
+            params = params)
 
         self._check_common_exceptions(response)
         if response.status_code == 404:
@@ -309,8 +321,8 @@ class Playlists(Endpoint):
             raise AuthorizationError(response.json()['detail'])
         return response
 
-    def get_latest(self):
-        response = self.client.get(self.url + '/latest')
+    async def get_latest(self):
+        response = await self.client.get(self.url + '/latest')
         self._check_common_exceptions(response)
         if response.status_code == 404:
             raise NotFoundError(response.json()['detail'])
@@ -318,12 +330,13 @@ class Playlists(Endpoint):
             raise AuthorizationError(response.json()['detail'])
         return response
 
-    def patch(self, id: str, title: str | None = None, privacy_status: str | None = None):
+    async def patch(self, id: str, title: str | None = None, privacy_status: str | None = None):
         if title is None and privacy_status is None:
             return
-        response = self.client.patch(self.url + f'/{id}',
-                                     json = {'title': title,
-                                             'privacy_status': privacy_status})
+        response = await self.client.patch(
+            self.url + f'/{id}',
+            json = {'title': title,
+                    'privacy_status': privacy_status})
         self._check_common_exceptions(response)
         if response.status_code == 404:
             raise NotFoundError(response.json()['detail'])
@@ -331,8 +344,8 @@ class Playlists(Endpoint):
             raise AuthorizationError(response.json()['detail'])
         return response
 
-    def delete(self, id: str):
-        response = self.client.delete(self.url + f'/{id}')
+    async def delete(self, id: str):
+        response = await self.client.delete(self.url + f'/{id}')
         self._check_common_exceptions(response)
         if response.status_code == 404:
             raise NotFoundError(response.json()['detail'])
@@ -340,8 +353,8 @@ class Playlists(Endpoint):
             raise AuthorizationError(response.json()['detail'])
         return response
 
-    def get_items(self, id: str):
-        response = self.client.get(self.url + f'/{id}' + '/items')
+    async def get_items(self, id: str):
+        response = await self.client.get(self.url + f'/{id}' + '/items')
         self._check_common_exceptions(response)
         if response.status_code == 404:
             raise NotFoundError(response.json()['detail'])
@@ -349,10 +362,11 @@ class Playlists(Endpoint):
             raise AuthorizationError(response.json()['detail'])
         return response
 
-    def post_item(self, id: str, video_id: str, pos: int | None = None):
-        response = self.client.post(self.url + f'/{id}' + '/items',
-                                    json = {'video_id': video_id,
-                                            'pos': pos})
+    async def post_item(self, id: str, video_id: str, pos: int | None = None):
+        response = await self.client.post(
+            self.url + f'/{id}' + '/items',
+            json = {'video_id': video_id,
+                    'pos': pos})
         self._check_common_exceptions(response)
         if response.status_code == 404:
             raise NotFoundError(response.json()['detail'])
@@ -360,7 +374,7 @@ class Playlists(Endpoint):
             raise AuthorizationError(response.json()['detail'])
         return response
 
-    def patch_item(self, id: str, mode: Literal["Replace", "Move"], sub_details: dict):
+    async def patch_item(self, id: str, mode: Literal["Replace", "Move"], sub_details: dict):
         """
         Calls patch method at /playlist/{id}/ route. This is used to replace a video within a playlist
         or adjust its position.
@@ -371,9 +385,10 @@ class Playlists(Endpoint):
                 - If `mode` is "Replace", then `sub_details` is of the form {'video_id': str, 'pos': int}.
                 - If `mode` is "Move", then `sub_details` is of the form {'init_pos': int, 'target_pos': int} 
         """
-        response = self.client.patch(self.url + f'/{id}' + '/items',
-                                     json = {'mode': mode,
-                                             'sub_details': sub_details})
+        response = await self.client.patch(
+            self.url + f'/{id}' + '/items',
+            json = {'mode': mode,
+                    'sub_details': sub_details})
         self._check_common_exceptions(response)
         if response.status_code == 404:
             raise NotFoundError(response.json()['detail'])
@@ -383,11 +398,12 @@ class Playlists(Endpoint):
             raise ValueError(response.json()['detail'])
         return response
 
-    def delete_item(self, id: str, pos: int):
+    async def delete_item(self, id: str, pos: int):
         # need to use .request() because .delete() doesn't accept a request body
-        response = self.client.request(method = "DELETE",
-                                       url = self.url + f'/{id}' + '/items',
-                                       json = {'pos': pos})
+        response = await self.client.request(
+            method = "DELETE",
+            url = self.url + f'/{id}' + '/items',
+            json = {'pos': pos})
         self._check_common_exceptions(response)
         if response.status_code == 404:
             raise NotFoundError(response.json()['detail'])

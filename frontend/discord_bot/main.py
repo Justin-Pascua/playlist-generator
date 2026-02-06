@@ -4,6 +4,7 @@ from discord.ext import commands
 import pandas as pd
 
 import io
+import sys
 from typing import Optional, Literal
 import datetime as dt
 import httpx
@@ -12,13 +13,25 @@ from .config import settings
 from . import utils
 from api_wrapper.main import APIWrapper, ping
 
-
-# from api_wrapper.main import APIWrapper
-
 TOKEN = settings.DISCORD_TOKEN.get_secret_value()
 YT_API_KEY = settings.YT_API_KEY.get_secret_value()
 SERVER_ID = settings.DISCORD_DEV_SERVER_ID.get_secret_value()
-GUILD_ID = discord.Object(SERVER_ID)
+
+if len(sys.argv) < 2:
+    print("Error: No arguments provided.")
+    print("Options: DEV or PROD")
+    sys.exit(1)
+
+GUILD_ID = None
+if sys.argv[1] == 'DEV':
+    GUILD_ID = discord.Object(SERVER_ID)
+elif sys.argv[1] == 'PROD':
+    GUILD_ID = None
+else:
+    print(f"Error: Invalid argument provided: '{sys.argv[1]}'")
+    print("Options: DEV or PROD")
+    sys.exit(1)
+
 
 class Client(commands.Bot):
     def __init__(self, **kwargs):
@@ -27,17 +40,22 @@ class Client(commands.Bot):
         self.guild_credentials = dict() # keys are guild id's, values are dict of form {'username': ..., 'password': ...}
         self._YT_API_KEY = YT_API_KEY
 
-    async def on_ready(self):
+    async def setup_hook(self):
         """
-        Start up function. Called after initialization
-        """        
-        print(f"Logged on as {self.user}!")
+        Start up function called only once.
+        """
         try:
-            guild = discord.Object(id = SERVER_ID)
-            synced = await self.tree.sync(guild = guild)
-            print(f'Synced {len(synced)} commands to {guild.id}')
+            synced = await self.tree.sync(guild = GUILD_ID)
+            print(f'Synced {len(synced)} commands')
         except Exception as e:
             print(f'Error syncing commands: {e}')
+    
+    async def on_ready(self):
+        """
+        Start up function. Called after initialization (after steup_hook) 
+        and after reconnects 
+        """        
+        print(f"Logged on as {self.user}!")
 
     async def get_api_client(self, interaction: discord.Interaction) -> APIWrapper:
         """
@@ -53,7 +71,7 @@ class Client(commands.Bot):
         try:
             current_client: APIWrapper = self.api_clients[interaction.guild_id]
             current_credentials = self.guild_credentials[interaction.guild_id]
-            current_client.login(**current_credentials)
+            await current_client.login(**current_credentials)
             return current_client
         except KeyError:
             # if not, create new client
@@ -63,11 +81,11 @@ class Client(commands.Bot):
             new_client = APIWrapper(self._YT_API_KEY)
             try:
                 # try logging in
-                new_client.login(**new_credentials)
+                await new_client.login(**new_credentials)
             except ValueError:
                 # if user doesn't exist in main API, then create new user
-                new_client.create_user(**new_credentials)
-                new_client.login(**new_credentials)
+                await new_client.create_user(**new_credentials)
+                await new_client.login(**new_credentials)
             finally:
                 self.api_clients[interaction.guild_id] = new_client
                 return new_client
@@ -80,10 +98,11 @@ client = Client(command_prefix = "/", intents = intents)
 # General commands
 @client.tree.command(name = 'help', description = 'Get general info about this bot', guild = GUILD_ID)
 async def help(interaction: discord.Interaction):
+    guide_url = 'https://docs.google.com/document/d/10KG11KKhcBYBdYKiKbL_IoNlYHDFSJ2uJuIrS26gFWA/edit?usp=sharing'
     output_str = "This bot helps teams by automating the process of creating YouTube playlists. " \
     "It records which songs and which videos your team uses in order to better match your " \
     "preferences. Users can add, edit, delete, merge, and split songs. For a comprehensive explanation " \
-    "of all the commands, and how the bot works, please refer to [LINK HERE]"
+    f"of all the commands, and how the bot works, please refer to {guide_url}"
     
     await interaction.response.send_message(output_str)
 
@@ -113,9 +132,10 @@ async def summarize_songs(interaction: discord.Interaction, starts_with: str = N
         return 
 
     try:
-        response = api_client.summarize_songs(starts_with = starts_with, 
-                                                    include_alts = include_alts,
-                                                    include_links = include_links)
+        response = await api_client.summarize_songs(
+            starts_with = starts_with, 
+            include_alts = include_alts,
+            include_links = include_links)
         output_str = response['detail']
         if len(output_str) < 2000:
             await interaction.followup.send(output_str,
@@ -154,7 +174,7 @@ async def create_song(interaction: discord.Interaction, title: str,
         if alt_titles is not None:
             alt_titles = [title.strip() for title in alt_titles.split(';') if title.strip() != ""]
 
-        response = api_client.create_song(title = title, alt_names = alt_titles, video_link = video_link)
+        response = await api_client.create_song(title = title, alt_names = alt_titles, video_link = video_link)
         output_str = ""
         for i, item in enumerate(response['detail']):
             if i == 0:
@@ -181,7 +201,7 @@ async def modify_title(interaction: discord.Interaction, old_title: str, new_tit
     
     try:
         new_title = new_title.strip()
-        response = api_client.modify_title(old_title, new_title)
+        response = await api_client.modify_title(old_title, new_title)
         await interaction.followup.send(response['detail'])
     except Exception as e:
         await interaction.followup.send(f"Unexpected error occurred. {e}")
@@ -202,7 +222,7 @@ async def delete_song(interaction: discord.Interaction, title: str):
         return 
 
     try:
-        response = api_client.delete_song(title)
+        response = await api_client.delete_song(title)
         await interaction.followup.send(response['detail'])
     except Exception as e:
         await interaction.followup.send(f"Unexpected error occurred. {e}")
@@ -224,8 +244,9 @@ async def add_alt_names(interaction: discord.Interaction, song_title: str, alt_t
     
     try:
         alt_titles = [title.strip() for title in alt_titles.split(';') if title.strip() != ""]
-        response = api_client.add_alt_names(target_title = song_title, 
-                                            alt_names = alt_titles)
+        response = await api_client.add_alt_names(
+            target_title = song_title, 
+            alt_names = alt_titles)
         output_str = ""
         for item in response['detail']:
             output_str += f"- {item} \n"
@@ -247,7 +268,7 @@ async def delete_alt_names(interaction: discord.Interaction, alt_title: str):
         return 
     
     try:
-        response = api_client.delete_alt_name(alt_name = alt_title)
+        response = await api_client.delete_alt_name(alt_name = alt_title)
         await interaction.followup.send(response['detail'])
     except Exception as e:
         await interaction.followup.send(f"Unexpected error occurred. {e}")
@@ -270,7 +291,7 @@ async def merge_songs(interaction: discord.Interaction, priority_song: str, othe
         return 
     
     try:
-        response = api_client.merge_songs(priority_song, other_song)
+        response = await api_client.merge_songs(priority_song, other_song)
         await interaction.followup.send(response['detail'])
     except Exception as e:
         await interaction.followup.send(f"Unexpected error occurred. {e}")
@@ -289,7 +310,7 @@ async def splinter_song(interaction: discord.Interaction, alt_title: str):
         return 
     
     try:
-        response = api_client.splinter_song(target_song = alt_title)
+        response = await api_client.splinter_song(target_song = alt_title)
         await interaction.followup.send(response['detail'])
     except Exception as e:
         await interaction.followup.send(f"Unexpected error occurred. {e}")
@@ -309,7 +330,7 @@ async def assign_video(interaction: discord.Interaction, song_title: str, video_
         return 
     
     try:
-        response = api_client.assign_video(song_title, video_link)
+        response = await api_client.assign_video(song_title, video_link)
         await interaction.followup.send(response['detail'])
     except Exception as e:
         await interaction.followup.send(f"Unexpected error occurred. {e}")
@@ -333,9 +354,10 @@ async def generate_playlist(interaction: discord.Interaction, playlist_title: st
     
     try:
         song_titles = [title.strip() for title in song_titles.split(';') if title.strip() != ""]
-        response = await api_client.generate_playlist(title = playlist_title,
-                                                privacy_status = privacy_status,
-                                                song_titles = song_titles)
+        response = await api_client.generate_playlist(
+            title = playlist_title,
+            privacy_status = privacy_status,
+            song_titles = song_titles)
         output_str = f"Title: {response['content']['playlist_title']} \n"
         output_str += f"Link: {response['content']['link']} \n"
         output_str += f"Summary: \n"
@@ -360,7 +382,7 @@ async def summarize_playlists(interaction: discord.Interaction, mode: Literal['a
         return 
     
     try:
-        response = api_client.summarize_playlists(latest_only = (mode == 'recent'))
+        response = await api_client.summarize_playlists(latest_only = (mode == 'recent'))
         await interaction.followup.send(response['detail'],
                                         suppress_embeds = (mode == 'all'))
     except Exception as e:
@@ -382,7 +404,7 @@ async def edit_playlist_title(interaction: discord.Interaction, old_title: str, 
     
     try:
         new_title = new_title.strip()
-        response = api_client.edit_playlist_title(old_title, new_title)
+        response = await api_client.edit_playlist_title(old_title, new_title)
         await interaction.followup.send(response['detail'])
     except Exception as e:
         await interaction.followup.send(f"Unexpected error occurred. {e}")
@@ -404,9 +426,10 @@ async def add_to_playlist(interaction: discord.Interaction, playlist_title: str,
         return 
     
     try:
-        response = api_client.add_to_playlist(playlist_title = playlist_title,
-                                              video_link = video_link,
-                                              record_in_db = True)
+        response = await api_client.add_to_playlist(
+            playlist_title = playlist_title,
+            video_link = video_link,
+            record_in_db = True)
         await interaction.followup.send(response['detail'])
     except Exception as e:
         await interaction.followup.send(f"Unexpected error occurred. {e}")
@@ -428,9 +451,10 @@ async def replace_vid_in_playlist(interaction: discord.Interaction, playlist_tit
     
     try:
         # subtract 1 from position because we use 0-indexing, while users use 1-indexing
-        response = api_client.replace_vid_in_playlist(playlist_title = playlist_title,
-                                                      pos = position - 1,
-                                                      video_link = video_link)
+        response = await api_client.replace_vid_in_playlist(
+            playlist_title = playlist_title,
+            pos = position - 1,
+            video_link = video_link)
         await interaction.followup.send(response['detail'])
     except Exception as e:
         await interaction.followup.send(f"Unexpected error occurred. {e}")
@@ -454,9 +478,10 @@ async def move_vid_in_playlist(interaction: discord.Interaction, playlist_title:
     
     try:
         # subtract 1 from position because we use 0-indexing, while users use 1-indexing
-        response = api_client.move_vid_in_playlist(playlist_title = playlist_title,
-                                                   init_pos = initial_position - 1,
-                                                   target_pos = final_position - 1)
+        response = await api_client.move_vid_in_playlist(
+            playlist_title = playlist_title,
+            init_pos = initial_position - 1,
+            target_pos = final_position - 1)
         await interaction.followup.send(response['detail'])
     except Exception as e:
         await interaction.followup.send(f"Unexpected error occurred. {e}")
@@ -477,8 +502,9 @@ async def remove_from_playlist(interaction: discord.Interaction, playlist_title:
     
     try:
         # subtract 1 from position because we use 0-indexing, while users use 1-indexing
-        response = api_client.remove_from_playlist(playlist_title = playlist_title,
-                                                   pos = position - 1)
+        response = await api_client.remove_from_playlist(
+            playlist_title = playlist_title,
+            pos = position - 1)
         await interaction.followup.send(response['detail'])
     except Exception as e:
         await interaction.followup.send(f"Unexpected error occurred. {e}")
@@ -520,7 +546,7 @@ async def import_csv(interaction: discord.Interaction, file: discord.Attachment)
             )
             return
         
-        response = api_client.import_songs(df)
+        response = await api_client.import_songs(df)
         await status_msg.edit(content = f"{response['detail']}")
     except Exception as e:
         await status_msg.edit(content = f"Unexpected error: {e}")
@@ -535,7 +561,7 @@ async def export_csv(interaction: discord.Interaction):
         return 
     
     try:
-        songs = api_client.get_all_songs()
+        songs = await api_client.get_all_songs()
         if len(songs) == 0:
             await interaction.followup.send(content = "No songs in your database, so no file generated!")
             return
