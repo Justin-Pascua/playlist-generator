@@ -15,4 +15,3 @@ model/
 db_scripts/
 
 docker-compose*
-*Dockerfile*
