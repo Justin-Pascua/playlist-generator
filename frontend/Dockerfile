@@ -8,4 +8,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY ./frontend .
 
-CMD ["python", "-m", "discord_bot.main", "DEV"]
+CMD ["./entrypoint.sh"]
