@@ -287,6 +287,7 @@ async def delete_alt_names(interaction: discord.Interaction, alt_title: str):
         response = await api_client.delete_alt_name(alt_name = alt_title)
         await interaction.followup.send(response['detail'])
     except Exception as e:
+        raise e
         await interaction.followup.send(f"Unexpected error occurred. {e}")
 
 @client.tree.command(name = 'merge-songs', 
@@ -421,6 +422,26 @@ async def edit_playlist_title(interaction: discord.Interaction, old_title: str, 
     try:
         new_title = new_title.strip()
         response = await api_client.edit_playlist_title(old_title, new_title)
+        await interaction.followup.send(response['detail'])
+    except Exception as e:
+        await interaction.followup.send(f"Unexpected error occurred. {e}")
+
+@client.tree.command(name = 'delete-playlist', description = 'Delete a playlist.', guild = GUILD_ID)
+async def delete_playlist(interaction: discord.Interaction, title: str):
+    """
+    Args:
+        title: The title of the playlist you want to delete.
+    """
+    await interaction.response.defer(thinking = True)
+    try:
+        api_client = await client.get_api_client(interaction)
+    except httpx.ConnectError as e:
+        await interaction.followup.send(f"Operation aborted. {e}")
+        return 
+    
+    try:
+        title = title.strip()
+        response = await api_client.delete_playlist(title)
         await interaction.followup.send(response['detail'])
     except Exception as e:
         await interaction.followup.send(f"Unexpected error occurred. {e}")

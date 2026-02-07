@@ -278,7 +278,7 @@ class APIWrapper():
         except ConflictError:
             final_response['detail'].append(f"Operation aborted. There is already a song with the title '{title}'!")
             return final_response
-        final_response['detail'].append('Song created!')
+        final_response['detail'].append(f"Song '{title}' created!")
 
         # insert alt names
         if alt_names is None:
@@ -335,16 +335,28 @@ class APIWrapper():
         try:
             playlist = await self._db_search_playlist(old_title)
         except NotFoundError:
-            return {"detail": f"Aborted operation. Could not find playlist with title '{old_title}'!"}
+            return {"detail": f"Operation aborted. Could not find playlist with title '{old_title}'!"}
             
         try:
             await self.playlists.patch(
                 id = playlist['id'],
                 title = new_title)
-            return {"detail": f"Successfully changed playlist title!"}
+            return {"detail": f"Successfully changed playlist title from {old_title} to {new_title}!"}
         except:
-            return {"detail": f"Abandoned operation. Unexpected error while calling YouTube Data API"}
+            return {"detail": f"Operation aborted. Unexpected error while calling YouTube Data API"}
+
+    async def delete_playlist(self, title: str):
+        try:
+            playlist = await self._db_search_playlist(title)
+        except NotFoundError:
+            return {"detail": f"Operation aborted. Could not find playlist with title '{title}'!"}
             
+        try:
+            await self.playlists.delete(id = playlist['id'])
+            return {"detail": f"Successfully deleted playlist '{title}'!"}
+        except:
+            return {"detail": f"Operation aborted. Unexpected error while calling YouTube Data API"}
+
     async def add_to_playlist(self, playlist_title: str, video_link: str, record_in_db: bool = False):
         self._check_yt_api_key()
         # fetch playlist id by searching db by name
@@ -372,7 +384,7 @@ class APIWrapper():
             return {"detail": "Unexpected error occured while calling YouTube Data API"}
         
         if not record_in_db:
-            return {"detail": "Successfully added video!"}
+            return {"detail": f"Successfully added video to '{playlist_title}'!"}
 
         # try creating new song for provided video
         try:
@@ -425,7 +437,7 @@ class APIWrapper():
             return {"detail": "Unexpected error occured while calling YouTube Data API"}
         
         if not record_in_db:
-            return {"detail": "Successfully replaced video!"}
+            return {"detail": f"Successfully replaced video in {playlist_title}!"}
 
         # try creating new song for provided video
         try:
@@ -464,7 +476,7 @@ class APIWrapper():
         except:
             return {"detail": "Unexpected error occured while calling YouTube Data API"}
         
-        return {"detail": "Successfully edited playlist!"}
+        return {"detail": f"Successfully moved video in '{playlist_title}'!"}
 
     async def remove_from_playlist(self, playlist_title: str, pos: int):
         try:
@@ -480,7 +492,7 @@ class APIWrapper():
         except:
             return {"detail": "Unexpected error occured while calling YouTube Data API"}
         
-        return {"detail": "Successfuly removed video from playlist!"}
+        return {"detail": f"Successfuly removed video from {playlist_title}!"}
 
     # SONG MANAGEMENT
     async def merge_songs(self, priority_song: str, other_song: str):
@@ -495,7 +507,7 @@ class APIWrapper():
             return {"detail": f"Merge failed. Could not find song with the title '{other_song}'"}
 
         await self.songs.merge([song2['id']], song1['id'])
-        return {"detail": "Songs successfully merged!"}
+        return {"detail": f"Successfully merged '{other_song}' into '{priority_song}'!"}
         
     async def splinter_song(self, target_song: str):
         try:
@@ -506,7 +518,7 @@ class APIWrapper():
         
         try:
             await self.songs.splinter(alt_name['id'])
-            return {"detail": "Song successfully splintered!"}
+            return {"detail": f"Successfully splintered {target_song} into its own song!"}
         except ConflictError as e:
             return {"detail": f"Splinter failed. {e}"}
 
@@ -516,7 +528,7 @@ class APIWrapper():
             await self.songs.delete(song['id'])
         except NotFoundError:
             return {"detail": f"Song '{title}' not found!"}
-        return {"detail": "Successfully deleted song!"}
+        return {"detail": f"Successfully deleted {title}!"}
 
     async def add_alt_names(self, target_title: str, alt_names: List[str]):
         response = {'detail': []}
@@ -538,7 +550,8 @@ class APIWrapper():
 
     async def delete_alt_name(self, alt_name: str):
         try:
-            target = await self.alt_names.get(query_str = alt_name).json()[0]
+            response = await self.alt_names.get(query_str = alt_name)
+            target = response.json()[0]
             await self.alt_names.delete(target['id'])
         except NotFoundError:
             return {"detail": f"Alt title '{alt_name}' not found!"}
@@ -560,7 +573,7 @@ class APIWrapper():
         except ConflictError:
             return {"detail": f"Update failed. The title '{new_title}' is already taken!"}
         
-        return {"detail": "Successfully updated song title!"}
+        return {"detail": f"Successfully updated title to '{new_title}'!"}
   
     async def assign_video(self, song_title: str, video_link: str):
         try:
@@ -572,7 +585,7 @@ class APIWrapper():
                 video['id'],
                 video['video_title'],
                 video['channel_name'])
-            return {"detail": "Successfully assigned video!"}
+            return {"detail": f"Successfully assigned the video '{video['video_title']}' to '{song_title}'!"}
         except NotFoundError:
             return {"detail": f"Assignment failed. Could not find song with title '{song_title}'"}
         except VideoLinkParserError:
