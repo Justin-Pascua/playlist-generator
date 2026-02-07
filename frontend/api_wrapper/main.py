@@ -1,7 +1,11 @@
-import httpx
-from typing import List, Optional
 import pandas as pd
+
+import httpx
 import asyncio
+import jwt
+import time
+from typing import List, Optional
+
 
 from .endpoints import BASE_URL, Endpoint, Authentication, Users, AltNames, Songs, Playlists
 from .exceptions import (AuthenticationError, AuthorizationError, NotFoundError, 
@@ -51,8 +55,14 @@ class APIWrapper():
     async def login(self, username: str, password: str):
         # raises AuthenticationError if user doesn't exist or bad credentials
         response = await self.authentication.post(username, password)
-        self.client.headers["authorization"] = f"Bearer {response.json()['access_token']}"     
-        return {'detail': 'Successfully logged in'}
+        
+        token = response.json()['access_token']
+        payload = jwt.decode(token, options = {'verify_signature': False})
+        exp_time = payload['exp']
+        
+        self.client.headers["authorization"] = f"Bearer {token}"     
+        return {'detail': 'Successfully logged in',
+                'exp_time': exp_time}
 
     async def create_user(self, username: str, password: str):
         # raises ConflictError if username is taken

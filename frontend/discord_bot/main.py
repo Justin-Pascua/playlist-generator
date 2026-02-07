@@ -7,15 +7,18 @@ import io
 import sys
 from typing import Optional, Literal
 import datetime as dt
+import time
 import httpx
 
 from .config import settings
 from . import utils
 from api_wrapper.main import APIWrapper, ping
+from api_wrapper.exceptions import AuthenticationError
 
 TOKEN = settings.DISCORD_TOKEN.get_secret_value()
 YT_API_KEY = settings.YT_API_KEY.get_secret_value()
 SERVER_ID = settings.DISCORD_DEV_SERVER_ID.get_secret_value()
+BUFFER = 300
 
 if len(sys.argv) < 2:
     print("Error: No arguments provided.")
@@ -38,6 +41,7 @@ class Client(commands.Bot):
         super().__init__(**kwargs)
         self.api_clients = dict()       # keys are guild id's, values are instances of APIWrapper
         self.guild_credentials = dict() # keys are guild id's, values are dict of form {'username': ..., 'password': ...}
+        self.token_exp_times = dict()   # keys are guild id's, values are expiry times 
         self._YT_API_KEY = YT_API_KEY
 
     async def setup_hook(self):
@@ -67,28 +71,37 @@ class Client(commands.Bot):
         if not ping():
             raise httpx.ConnectError("Main API is down!")
         
-        # try getting from existing clients
-        try:
-            current_client: APIWrapper = self.api_clients[interaction.guild_id]
-            current_credentials = self.guild_credentials[interaction.guild_id]
-            await current_client.login(**current_credentials)
+        current_guild_id = interaction.guild_id
+        # if api client exists for current guild, then use existing
+        if current_guild_id in self.api_clients:
+            current_client = self.api_clients[current_guild_id]
+
+            # if client's token is expired, then refresh
+            current_time = int(time.time())
+            if current_time >= self.token_exp_times[current_guild_id] - BUFFER:
+                current_credentials = self.guild_credentials[current_guild_id]
+                response = await current_client.login(**current_credentials)
+                self.token_exp_times[current_guild_id] = response['exp_time']
+
             return current_client
-        except KeyError:
-            # if not, create new client
-            new_credentials = {'username': f'{interaction.guild.name} {str(interaction.guild_id)[-4:]}',
-                               'password': str(interaction.guild_id)}
-            self.guild_credentials[interaction.guild_id] = new_credentials
+        # otherwise, create new api client
+        else:
+            new_credentials = {'username': f'{interaction.guild.name} {str(current_guild_id)[-4:]}',
+                               'password': str(current_guild_id)}
+            self.guild_credentials[current_guild_id] = new_credentials
             new_client = APIWrapper(self._YT_API_KEY)
             try:
                 # try logging in
-                await new_client.login(**new_credentials)
-            except ValueError:
+                response = await new_client.login(**new_credentials)
+                self.token_exp_times[current_guild_id] = response['exp_time']
+            except AuthenticationError:
                 # if user doesn't exist in main API, then create new user
                 await new_client.create_user(**new_credentials)
-                await new_client.login(**new_credentials)
-            finally:
-                self.api_clients[interaction.guild_id] = new_client
-                return new_client
+                response = await new_client.login(**new_credentials)
+                self.token_exp_times[current_guild_id] = response['exp_time']
+            
+            self.api_clients[interaction.guild_id] = new_client
+            return new_client
 
 intents = discord.Intents.default()
 intents.message_content = True
