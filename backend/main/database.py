@@ -5,7 +5,7 @@ from urllib.parse import quote_plus
 from .config import settings
 
 DB_USER = settings.MYSQL_USER.get_secret_value()
-DB_PASSWORD_ENCODED = quote_plus(settings.MYSQL_PASSWORD.get_secret_value())   # url encoding
+DB_PASSWORD_ENCODED = quote_plus(settings.MYSQL_PASSWORD.get_secret_value()).replace('%', '%%')   # url encoding
 DB_HOST = settings.MYSQL_HOST.get_secret_value()
 DB_PORT = settings.MYSQL_PORT
 DB_NAME = settings.MYSQL_DB_NAME.get_secret_value()
