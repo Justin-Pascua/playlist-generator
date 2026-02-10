@@ -588,8 +588,8 @@ async def import_csv(interaction: discord.Interaction, file: discord.Attachment)
     except Exception as e:
         await status_msg.edit(content = f"Unexpected error: {e}")
 
-@client.tree.command(name = 'export-songs', description = 'Export all songs in your database into a .csv file', guild = GUILD_ID)
-async def export_csv(interaction: discord.Interaction):
+@client.tree.command(name = 'export-songs', description = 'Export all songs in your database file', guild = GUILD_ID)
+async def export(interaction: discord.Interaction, format: Literal['.csv', '.pdf']):
     await interaction.response.defer(thinking = True)
     try:
         api_client = await client.get_api_client(interaction)
@@ -603,16 +603,29 @@ async def export_csv(interaction: discord.Interaction):
             await interaction.followup.send(content = "No songs in your database, so no file generated!")
             return
         
-        df = utils.json_songs_to_df(songs)
-        csv_string = df.to_csv(index = False)
-        csv_bytes = csv_string.encode('utf-8')
-        csv_file = discord.File(
-            io.BytesIO(csv_bytes),
-            filename = f"{interaction.user.name}_data_{dt.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
-        )
+        file = None
+        if format == '.csv':
+            df = utils.json_songs_to_df(songs)
+            csv_string = df.to_csv(index = False)
+            csv_bytes = csv_string.encode('utf-8')
+            file = discord.File(
+                io.BytesIO(csv_bytes),
+                filename = f"{interaction.guild.name}_data_{dt.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+            )
+        elif format == '.pdf':
+            pdf_buffer = io.BytesIO()
+            utils.generate_songs_pdf_table(
+                data = songs,
+                buffer = pdf_buffer,
+                user_name = interaction.guild.name
+            )
+            file = discord.File(
+                pdf_buffer,
+                filename = f"{interaction.guild.name}_data_{dt.datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+            )
         await interaction.followup.send(
             content = f"Your data is ready!",
-            file = csv_file
+            file = file
         )
     except Exception as e:
         await interaction.followup.send(content = f"Unexpected error occured: {e}")
