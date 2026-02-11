@@ -1,8 +1,10 @@
 #!/bin/sh
 set -e
 
-echo "Waiting for API..."
-until curl -sf http://api:8000/; do
+BASE_URL="${BASE_URL:-http://localhost:8000}"
+
+echo "Waiting for API at $BASE_URL"
+until curl -sf "$BASE_URL/"; do
   sleep 1
 done
 
