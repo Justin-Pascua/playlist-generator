@@ -12,7 +12,11 @@ DB_NAME = settings.MYSQL_DB_NAME.get_secret_value()
 
 DB_URL = f"mysql+mysqlconnector://{DB_USER}:{DB_PASSWORD_ENCODED}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
-engine = create_engine(DB_URL)
+engine = create_engine(
+    DB_URL,
+    pool_pre_ping = True,
+    pool_recycle = 1800,
+)
 
 Session = sessionmaker(
     autocommit = False, 
