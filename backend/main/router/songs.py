@@ -27,11 +27,11 @@ router = APIRouter(
 # SONG SUMMARIES
 @router.get("/", response_model = List[SongSummary])
 async def get_all_songs(query_str: Optional[str] = None,
-                        starts_with: Annotated[str, Query(min_length = 1, max_length = 1)] = None,
+                        exact_match: bool = False,
                         db: Session = Depends(get_db),
                         current_user = Depends(auth_utils.get_current_user)):
     """
-    Returns all songs in the database, and (optionally) alternate titles plus video links
+    Returns all songs in the database
     """
 
     # choose fields to fetch
@@ -57,9 +57,10 @@ async def get_all_songs(query_str: Optional[str] = None,
         .group_by(Canonical.id, Canonical.title, Video.link))
     
     if query_str is not None:
-        stmt = stmt.having(func.sum(AltName.title.like(f"%{query_str}%")) > 0)
-    if starts_with is not None:
-        stmt = stmt.having(Canonical.title.startswith(starts_with))
+        if exact_match:
+            stmt = stmt.having(func.sum(AltName.title == query_str) > 0)
+        else:
+            stmt = stmt.having(func.sum(AltName.title.like(f"%{query_str}%")) > 0)
     stmt = stmt.order_by(Canonical.title)
 
     result = db.execute(stmt).all() 

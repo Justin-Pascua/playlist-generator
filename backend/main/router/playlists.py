@@ -91,12 +91,16 @@ async def create_playlist(details: PlaylistCreate, db: Session = Depends(get_db)
     Create a playlist
     """
     # create blank playlist through YT API
-    playlist_editor = youtube.PlaylistEditor(
-        mode = 'create_new', 
-        title = details.title,
-        privacy_status = details.privacy_status,
-        yt_service = yt_service
-    )
+    try:
+        playlist_editor = youtube.PlaylistEditor(
+            mode = 'create_new', 
+            title = details.title,
+            privacy_status = details.privacy_status,
+            yt_service = yt_service
+        )
+    except HttpError as e:
+        raise HTTPException(status_code = e.status_code,
+                            detail = e.error_details[0]['message'])
 
     # record playlist details in database
     new_playlist = Playlist(
@@ -175,7 +179,9 @@ async def delete_playlist(id: str, db: Session = Depends(get_db),
     if playlist.user_id != current_user.id:
         raise HTTPException(status_code = status.HTTP_403_FORBIDDEN,
                             detail = f"You do not have access to this playlist")
-    
+    db.delete(playlist)
+    db.commit()
+
     # delete actual playlist through YT API
     try:
         response = youtube.delete_playlist(id, yt_service)
@@ -183,9 +189,6 @@ async def delete_playlist(id: str, db: Session = Depends(get_db),
     except HttpError as e:
         raise HTTPException(status_code = e.status_code,
                             detail = e.error_details[0]['message'])
-
-    db.delete(playlist)
-    db.commit()
 
     return Response(status_code = status.HTTP_204_NO_CONTENT)
 
@@ -209,8 +212,9 @@ async def get_playlist_items(id: str,
     # initialize editor
     try:
         playlist_editor = youtube.PlaylistEditor(mode = 'from_existing', playlist_id = id, yt_service = yt_service)
-    except Exception as e:
-        raise e
+    except HttpError as e:
+        raise HTTPException(status_code = e.status_code,
+                            detail = e.error_details[0]['message'])
 
     response = playlist_editor.items
 
@@ -237,9 +241,11 @@ async def insert_video(id: str,
     # initialize editor
     try:
         playlist_editor = youtube.PlaylistEditor(mode = 'from_existing', playlist_id = id, yt_service = yt_service)
-    except Exception as e:
-        raise e
+    except HttpError as e:
+        raise HTTPException(status_code = e.status_code,
+                            detail = e.error_details[0]['message'])
 
+    # insert video
     try:
         playlist_editor.insert_video(video_id = details.video_id,
                                     pos = details.pos,
@@ -247,6 +253,9 @@ async def insert_video(id: str,
     except ValueError as e:
         raise HTTPException(status_code = status.HTTP_400_BAD_REQUEST,
                             detail = str(e))
+    except HttpError as e:
+        raise HTTPException(status_code = e.status_code,
+                            detail = e.error_details[0]['message'])
         
     
     response = playlist_editor.items[details.pos if details.pos is not None else -1]
@@ -274,8 +283,9 @@ async def edit_playlist_item(id: str,
     # initialize editor
     try:
         playlist_editor = youtube.PlaylistEditor(mode = 'from_existing', playlist_id = id, yt_service = yt_service)
-    except Exception as e:
-        raise e
+    except HttpError as e:
+        raise HTTPException(status_code = e.status_code,
+                            detail = e.error_details[0]['message'])
     
     response = None
     if details.mode == "Move":
@@ -286,6 +296,9 @@ async def edit_playlist_item(id: str,
         except ValueError as e:
             raise HTTPException(status_code = status.HTTP_400_BAD_REQUEST,
                                 detail = str(e))
+        except HttpError as e:
+            raise HTTPException(status_code = e.status_code,
+                                detail = e.error_details[0]['message'])
         response = playlist_editor.items[details.sub_details.target_pos]
     elif details.mode == "Replace":
         try:
@@ -295,6 +308,9 @@ async def edit_playlist_item(id: str,
         except ValueError as e:
             raise HTTPException(status_code = status.HTTP_400_BAD_REQUEST,
                                 detail = str(e))
+        except HttpError as e:
+            raise HTTPException(status_code = e.status_code,
+                                detail = e.error_details[0]['message'])
         response = playlist_editor.items[details.sub_details.pos]
 
     return response
@@ -320,13 +336,17 @@ async def remove_playlist_item(id: str,
     # initialize editor
     try:
         playlist_editor = youtube.PlaylistEditor(mode = 'from_existing', playlist_id = id, yt_service = yt_service)
-    except Exception as e:
-        raise e
+    except HttpError as e:
+        raise HTTPException(status_code = e.status_code,
+                            detail = e.error_details[0]['message'])
     
     try:
         playlist_editor.delete_video(pos = details.pos, yt_service = yt_service)
     except ValueError as e:
         raise HTTPException(status_code = status.HTTP_400_BAD_REQUEST,
                             detail = str(e))
+    except HttpError as e:
+        raise HTTPException(status_code = e.status_code,
+                            detail = e.error_details[0]['message'])
 
     return Response(status_code = status.HTTP_204_NO_CONTENT)
