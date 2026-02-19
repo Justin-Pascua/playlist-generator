@@ -3,7 +3,7 @@ import warnings
 from typing import List, Optional, Literal
 
 from .config import settings
-from .exceptions import (AuthenticationError, AuthorizationError, NotFoundError, 
+from .exceptions import (AuthenticationError, AuthorizationError, NotFoundError, YTServiceError,
                          ConflictError, VideoLinkParserError, PartialOperationWarning)
 
 BASE_URL = settings.BASE_URL
@@ -16,6 +16,8 @@ class Endpoint():
     def _check_common_exceptions(self, response):
         if response.status_code == 500:
             raise RuntimeError("Unexpected server error")
+        elif response.status_code == 503:
+            raise YTServiceError("YT service momentarily unavailable. Please retry")
         elif response.status_code == 429:
             raise RuntimeError("API received too many requests")
         elif response.status_code == 422:
@@ -167,7 +169,7 @@ class Songs(Endpoint):
 
         return response
 
-    async def get(self, id: int = None, query_str: str = None, starts_with: str = None):
+    async def get(self, id: int = None, query_str: str = None, exact_match: bool = False):
         response = None
         if id is not None:
             response = await self.client.get(self.url + f'/{id}')
@@ -175,8 +177,8 @@ class Songs(Endpoint):
             params = dict()
             if query_str is not None:
                 params['query_str'] = query_str
-            if starts_with is not None:
-                params['starts_with'] = starts_with
+            if exact_match is not None:
+                params['exact_match'] = exact_match
             response = await self.client.get(
                 self.url,
                 params = params)

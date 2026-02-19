@@ -4,12 +4,11 @@ import httpx
 import asyncio
 import jwt
 import time
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 
 from .endpoints import BASE_URL, Endpoint, Authentication, Users, AltNames, Songs, Playlists
-from .exceptions import (AuthenticationError, AuthorizationError, NotFoundError, 
-                         ConflictError, VideoLinkParserError, PartialOperationWarning)
+from .exceptions import *
 from . import utils
 
 
@@ -44,6 +43,24 @@ class APIWrapper():
     def set_yt_api_key(self, key: str):
         self.YT_API_KEY = key
 
+    async def _request_with_retry(self, async_func, expected_exceptions: Tuple[Exception] = None, **kwargs):
+        max_attempts = 5
+        base_delay = 0.5
+        
+        if expected_exceptions is None:
+            expected_exceptions = Exception
+        
+        for attempt in range(max_attempts):
+            try:
+                return_val = await async_func(**kwargs)
+                return return_val
+            except expected_exceptions as e:
+                if attempt == max_attempts - 1:
+                    raise e
+
+                delay = base_delay * (2 ** attempt)
+                await asyncio.sleep(delay)
+
     # AUTH
     async def login_status(self):
         try:
@@ -70,14 +87,9 @@ class APIWrapper():
         return {'detail': 'User successfully created'}
 
     # READ
-    async def get_all_songs(self, starts_with: str = None, query_str: str = None):
-        if starts_with is not None:
-            if type(starts_with) != str:
-                raise ValueError('starts_with must be a string of length 1')
-            if len(starts_with) > 1:
-                raise ValueError('starts_with must be a string of length 1')
+    async def get_all_songs(self, exact_match: bool = False, query_str: str = None):
         try:
-            response = await self.songs.get(starts_with = starts_with, query_str = query_str)
+            response = await self.songs.get(exact_match = exact_match, query_str = query_str)
             return response.json()
         except NotFoundError:
             return []
@@ -96,11 +108,11 @@ class APIWrapper():
         except NotFoundError:
             return None
 
-    async def summarize_songs(self, starts_with: str = None, query_str: str = None,
+    async def summarize_songs(self, exact_match: bool = False, query_str: str = None,
                               include_alts: bool = True,
                               include_links: bool = True, 
                               print_result: bool = False):
-        all_songs = await self.get_all_songs(starts_with = starts_with, query_str = query_str)
+        all_songs = await self.get_all_songs(exact_match = exact_match, query_str = query_str)
 
         output_str = ""
         if len(all_songs) == 0:
@@ -158,7 +170,7 @@ class APIWrapper():
     # SEARCH
     async def _db_search_song(self, song_title: str):
         # searches songs by alt names, returns full song resource
-        response = await self.songs.get(query_str = song_title)
+        response = await self.songs.get(query_str = song_title, exact_match = True)
         return response.json()[0]
 
     async def _db_search_alt(self, alt_title: str):
@@ -252,7 +264,9 @@ class APIWrapper():
                 song_title = song_title,
                 insert_song_if_na = True,
                 insert_video_if_na = True)
-            videos.append(search_response['content'])
+            videos.append(search_response['content']
+                          )
+
             response['detail'].append(search_response['detail'])
 
         # if no error, then create playlist
@@ -261,10 +275,13 @@ class APIWrapper():
 
         for video in videos:
             await asyncio.sleep(1)   # pause before each iter to prevent excessive calls to YouTube data api
-            insert_response = await self.playlists.post_item(
+            insert_response = await self._request_with_retry(
+                async_func = self.playlists.post_item,
+                expected_exceptions = (YTServiceError),
                 id = playlist_response.json()['id'],
-                video_id = video['id'])
-
+                video_id = video['id']
+            )
+            
         return response
     
     async def create_song(self, title: str, alt_names: Optional[List[str]] = None, 
@@ -338,9 +355,12 @@ class APIWrapper():
             return {"detail": f"Operation aborted. Could not find playlist with title '{old_title}'!"}
             
         try:
-            await self.playlists.patch(
+            await self._request_with_retry(
+                self.playlists.patch, 
+                (YTServiceError), 
                 id = playlist['id'],
-                title = new_title)
+                title = new_title
+            )
             return {"detail": f"Successfully changed playlist title from {old_title} to {new_title}!"}
         except:
             return {"detail": f"Operation aborted. Unexpected error while calling YouTube Data API"}
@@ -352,7 +372,11 @@ class APIWrapper():
             return {"detail": f"Operation aborted. Could not find playlist with title '{title}'!"}
             
         try:
-            await self.playlists.delete(id = playlist['id'])
+            await self._request_with_retry(
+                self.playlists.delete,
+                (YTServiceError),
+                id = playlist['id']
+            )
             return {"detail": f"Successfully deleted playlist '{title}'!"}
         except:
             return {"detail": f"Operation aborted. Unexpected error while calling YouTube Data API"}
@@ -377,9 +401,12 @@ class APIWrapper():
         
         # insert into playlist
         try:
-            await self.playlists.post_item(
+            await self._request_with_retry(
+                self.playlists.post_item,
+                (YTServiceError),
                 id = playlist['id'],
-                video_id = video['id'])
+                video_id = video['id']
+                )
         except:
             return {"detail": "Unexpected error occured while calling YouTube Data API"}
         
@@ -424,12 +451,15 @@ class APIWrapper():
             
         # insert video into playlist
         try:
-            await self.playlists.patch_item(
+            await self._request_with_retry(
+                self.playlists.patch_item,
+                (YTServiceError),
                 id = playlist['id'],
                 mode = 'Replace',
                 sub_details = {
                     'video_id': video['id'],
-                    'pos': pos})
+                    'pos': pos}
+                )
         except ValueError as e:
             # raised when init_pos and target_pos are out of bounds 
             return {"detail": f"Aborted operation. {e}"}
@@ -464,12 +494,15 @@ class APIWrapper():
             return {"detail": f"Aborted operation. Could not find playlist titled '{playlist_title}'!"}
         
         try:
-            await self.playlists.patch_item(
+            await self._request_with_retry(
+                self.playlists.patch_item,
+                (YTServiceError),
                 id = playlist['id'],
                 mode = 'Move',
                 sub_details = {
                     'init_pos': init_pos,
-                    'target_pos': target_pos})
+                    'target_pos': target_pos}
+                )
         except ValueError as e:
             # raised when init_pos and target_pos are out of bounds 
             return {"detail": f"Aborted operation. {e}"}
@@ -485,7 +518,13 @@ class APIWrapper():
             return {"detail": f"Aborted operation. Could not find playlist titled '{playlist_title}'!"}
         
         try:
-            await self.playlists.delete_item(playlist['id'], pos)
+            await self._request_with_retry(
+                self.playlists.delete_item, 
+                (YTServiceError),
+                id = playlist['id'], 
+                pos = pos
+                )
+
         except ValueError as e:
             # raised when pos is out of bounds 
             return {"detail": f"Playlist not edited. {e}"}
