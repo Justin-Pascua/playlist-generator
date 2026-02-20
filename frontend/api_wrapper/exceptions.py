@@ -12,7 +12,7 @@ class ConflictError(Exception):
     """Corresponds to 409 response (i.e. resource already exists)"""
 
 class YTServiceError(Exception):
-    """Corresponds to 503 response (i.e. YT service unavailable)"""
+    """Corresponds to 503 response or 409 response (i.e. YT service unavailable)"""
 
 class VideoLinkParserError(Exception):
     """Raised when `utils.extract_video_id` cannot identify video id from a link"""

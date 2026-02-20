@@ -301,6 +301,9 @@ class Playlists(Endpoint):
             json = {'title': title,
                     'privacy_status': privacy_status})
         self._check_common_exceptions(response)
+        if response.status_code == 409:
+            raise YTServiceError("YT service momentarily unavailable. Please retry")
+        
         return response
 
     async def get(self, id: str = None, query_str: str = None):
@@ -321,6 +324,9 @@ class Playlists(Endpoint):
             raise NotFoundError(response.json()['detail'])
         elif response.status_code == 403:
             raise AuthorizationError(response.json()['detail'])
+        elif response.status_code == 409:
+            raise YTServiceError("YT service momentarily unavailable. Please retry")
+        
         return response
 
     async def get_latest(self):
@@ -330,6 +336,9 @@ class Playlists(Endpoint):
             raise NotFoundError(response.json()['detail'])
         elif response.status_code == 403:
             raise AuthorizationError(response.json()['detail'])
+        elif response.status_code == 409:
+            raise YTServiceError("YT service momentarily unavailable. Please retry")
+        
         return response
 
     async def patch(self, id: str, title: str | None = None, privacy_status: str | None = None):
@@ -344,6 +353,9 @@ class Playlists(Endpoint):
             raise NotFoundError(response.json()['detail'])
         elif response.status_code == 403:
             raise AuthorizationError(response.json()['detail'])
+        elif response.status_code == 409:
+            raise YTServiceError("YT service momentarily unavailable. Please retry")
+        
         return response
 
     async def delete(self, id: str):
@@ -353,6 +365,9 @@ class Playlists(Endpoint):
             raise NotFoundError(response.json()['detail'])
         elif response.status_code == 403:
             raise AuthorizationError(response.json()['detail'])
+        elif response.status_code == 409:
+            raise YTServiceError("YT service momentarily unavailable. Please retry")
+        
         return response
 
     async def get_items(self, id: str):
@@ -362,6 +377,9 @@ class Playlists(Endpoint):
             raise NotFoundError(response.json()['detail'])
         elif response.status_code == 403:
             raise AuthorizationError(response.json()['detail'])
+        elif response.status_code == 409:
+            raise YTServiceError("YT service momentarily unavailable. Please retry")
+        
         return response
 
     async def post_item(self, id: str, video_id: str, pos: int | None = None):
@@ -374,6 +392,9 @@ class Playlists(Endpoint):
             raise NotFoundError(response.json()['detail'])
         elif response.status_code == 403:
             raise AuthorizationError(response.json()['detail'])
+        elif response.status_code == 409:
+            raise YTServiceError("YT service momentarily unavailable. Please retry")
+        
         return response
 
     async def patch_item(self, id: str, mode: Literal["Replace", "Move"], sub_details: dict):
@@ -398,6 +419,9 @@ class Playlists(Endpoint):
             raise AuthorizationError(response.json()['detail'])
         elif response.status_code == 400:
             raise ValueError(response.json()['detail'])
+        elif response.status_code == 409:
+            raise YTServiceError("YT service momentarily unavailable. Please retry")
+        
         return response
 
     async def delete_item(self, id: str, pos: int):
@@ -413,5 +437,8 @@ class Playlists(Endpoint):
             raise AuthorizationError(response.json()['detail'])
         elif response.status_code == 400:
             raise ValueError(response.json()['detail'])
+        elif response.status_code == 409:
+            raise YTServiceError("YT service momentarily unavailable. Please retry")
+        
         return response
 
